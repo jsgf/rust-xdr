@@ -6,10 +6,6 @@ enum Value {
 
 #[derive(Debug)]
 enum Type {
-    Void,
-    Opaque,
-    String,
-    
     UInt,
     Int,
     UHyper,
@@ -18,14 +14,37 @@ enum Type {
     Double,
     Quadruple,
     Bool,
+
+    // Special array elements
+    Opaque,                     // binary
+    String,                     // text
+
+    // Compound types
     Enum(Vec<EnumDefn>),
     Struct(Vec<Decl>),
     Union(Box<Decl>, Vec<UnionCase>, Option<Box<Decl>>),
 
+    Option(Box<Type>),
+    Array(Box<Type>, Value),
+    Flex(Box<Type>, Option<Value>),
+
+    // Type reference (may be external)
     Ident(String),
 }
 
 impl Type {
+    fn array(ty: Type, sz: Value) -> Type {
+        Type::Array(Box::new(ty), sz)
+    }
+
+    fn flex(ty: Type, sz: Option<Value>) -> Type {
+        Type::Flex(Box::new(ty), sz)
+    }
+
+    fn option(ty: Type) -> Type {
+        Type::Option(Box::new(ty))
+    }
+
     fn union((d, c, dfl): (Decl, Vec<UnionCase>, Option<Decl>)) -> Type {
         Type::Union(Box::new(d), c, dfl.map(Box::new))
     }
@@ -40,24 +59,38 @@ struct UnionCase(Value, Decl);
 #[derive(Debug)]
 enum Decl {
     Void,
-    Scalar(String, Type),
-    Array(String, Type, Value),
-    Flex(String, Type, Option<Value>),
-    Option(String, Type),
+    Named(String, Type),
 }
 
 #[derive(Debug)]
 pub enum Defn {
-    Typedef(Decl),
+    Typedef(String, Type),
     Const(String, i64),
 }
 
 peg_file! grammar("xdr.rustpeg");
 
-#[test]
-fn xdr() {
-//    let s = grammar::specification("% pass\ntypedef int/**/intfoo;\n%pass2\n");
-    let s = grammar::specification(r#"
+#[cfg(test)]
+mod test {
+    use super::grammar;
+
+    #[test]
+    fn simple() {
+        let s = grammar::specification(r#"
+struct foo {
+        int bar;
+        int blat;
+};
+
+const blop = 123;
+"#);
+        println!("spec {:?}", s);
+        assert!(s.is_ok());
+    }
+
+    #[test]
+    fn large() {
+        let s = grammar::specification(r#"
 /* -*- c -*- */
 %/*
 % * Copyright 2011-2014  Exablox Corporation
@@ -602,6 +635,47 @@ case DMSG_RERROR:
 
 "#);
 
-    println!("spec {:?}", s);
-    assert!(s.is_ok())
+        println!("spec {:?}", s);
+        assert!(s.is_ok())
+    }
+
+    #[test]
+    fn typedef_void() {
+        let s = grammar::specification(r#"
+typedef void;           /* syntactically defined, semantically meaningless  */
+"#);
+
+        println!("spec {:?}", s);
+        assert!(s.is_err())
+    }
+
+    #[test]
+    fn kwishnames() {
+        let specs = vec!["const in = 1;",
+                         "const intt = 2;",
+                         "const intint = 3;",
+                         "struct unsignedint { int/**/foo;\n\tint\nbar; void;\n};",
+            ];
+
+        for sp in specs {
+            let s = grammar::specification(sp);
+            println!("spec sp \"{}\" => {:?}", sp, s);
+            assert!(s.is_ok())
+        }
+    }
+
+    #[test]
+    fn kwnames() {
+        let specs = vec!["const int = 1;",
+                         "struct void { int i; };",
+                         "struct foo { int int; };",
+                         "typedef int int;",
+                         ];
+
+        for sp in specs {
+            let s = grammar::specification(sp);
+            println!("spec {:?}", s);
+            assert!(s.is_err())
+        }
+    }
 }

@@ -1,25 +1,27 @@
+// Grammar for a .x file specifying XDR type codecs. Does not include any RPC syntax. Should match RFC4506.
+
 use super::{Value, Type, Decl, Defn, EnumDefn, UnionCase};
 
-endkw    = &(sp / symbol) __
+endkw    = ![a-zA-Z0-9_] __
 
 // Keywords
 bool     = "bool" endkw
-unsigned = "unsigned" endkw
-int      = "int" endkw
-hyper    = "hyper" endkw
-float    = "float" endkw
-double   = "double" endkw
-quadruple= "quadruple" endkw
-struct   = "struct" endkw
-enum     = "enum" endkw
-union    = "union" endkw
-typedef  = "typedef" endkw
-switch   = "switch" endkw
 case     = "case" endkw
-default  = "default" endkw
 const    = "const" endkw
+default  = "default" endkw
+double   = "double" endkw
+enum     = "enum" endkw
+float    = "float" endkw
+hyper    = "hyper" endkw
+int      = "int" endkw
 opaque   = "opaque" endkw
+quadruple= "quadruple" endkw
 string   = "string" endkw
+struct   = "struct" endkw
+switch   = "switch" endkw
+typedef  = "typedef" endkw
+union    = "union" endkw
+unsigned = "unsigned" endkw
 void     = "void" endkw
 
 // Symbols
@@ -84,14 +86,14 @@ number -> i64
     = "-"? [0-9]+                               { match_str.parse().unwrap() }
 
 declaration -> Decl
-    = t:type_spec id:identifier lbrack s:value rbrack  { Decl::Array(id, t, s) }
-    / t:type_spec id:identifier lt s:value? gt   { Decl::Flex(id, t, s) }
-    / t:type_spec star id:identifier             { Decl::Option(id, t) }
-    / t:type_spec id:identifier                  { Decl::Scalar(id, t) }
-    / opaque id:identifier lbrack s:value rbrack { Decl::Array(id, Type::Opaque, s) }
-    / opaque id:identifier lt s:value? gt        { Decl::Flex(id, Type::Opaque, s) }
-    / string id:identifier lt s:value? gt        { Decl::Flex(id, Type::String, s) }
-    / void                                      { Decl::Void }
+    = t:type_spec id:identifier lbrack s:value rbrack  { Decl::Named(id, Type::array(t, s)) }
+    / t:type_spec id:identifier lt s:value? gt   { Decl::Named(id, Type::flex(t, s)) }
+    / t:type_spec star id:identifier             { Decl::Named(id, Type::option(t)) }
+    / t:type_spec id:identifier                  { Decl::Named(id, t) }
+    / opaque id:identifier lbrack s:value rbrack { Decl::Named(id, Type::array(Type::Opaque, s)) }
+    / opaque id:identifier lt s:value? gt        { Decl::Named(id, Type::flex(Type::Opaque, s)) }
+    / string id:identifier lt s:value? gt        { Decl::Named(id, Type::flex(Type::String, s)) }
+    / void                                       { Decl::Void }
 
 value -> Value
     = c:constant                { Value::Const(c) }
@@ -147,14 +149,14 @@ union_default -> Decl
 const_def -> Defn
     = const id:identifier eq v:constant semi    { Defn::Const(id, v) }
 
-type_def -> Decl
-    = typedef d:declaration semi               { d }
-    / enum id:identifier e:enum_body semi      { Decl::Scalar(id, Type::Enum(e)) }
-    / struct id:identifier s:struct_body semi  { Decl::Scalar(id, Type::Struct(s)) }
-    / union id:identifier u:union_body semi    { Decl::Scalar(id, Type::union(u)) }
+type_def -> (String, Type)
+    = typedef d:declaration semi               { if let Decl::Named(name, ty) = d { (name, ty) } else { return Failed } }
+    / enum id:identifier e:enum_body semi      { (id, Type::Enum(e)) }
+    / struct id:identifier s:struct_body semi  { (id, Type::Struct(s)) }
+    / union id:identifier u:union_body semi    { (id, Type::union(u)) }
 
 definition -> Defn
-    = t:type_def        { Defn::Typedef(t) }
+    = t:type_def        { let (n, t) = t; Defn::Typedef(n, t) }
     / c:const_def       { c }
 
 #[pub]
