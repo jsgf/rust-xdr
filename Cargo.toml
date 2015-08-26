@@ -1,0 +1,7 @@
+[package]
+name = "xdr"
+version = "0.1.0"
+authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
+
+[dependencies]
+peg = "0.3.2"
