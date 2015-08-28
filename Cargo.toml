@@ -2,6 +2,18 @@
 name = "xdr"
 version = "0.1.0"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
+license = "MIT"
+description = "XDR codec generator from specification and runtime library"
+repository = "https://github.com/jsgf/rust-xdr"
+readme = "README.md"
+keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
+
+[[bin]]
+name = "xdrgen"
+path = "src/xdrgen.rs"
+test = false
+bench = false
 
 [dependencies]
 peg = "0.3.2"
+byteorder = "0.3.11"
