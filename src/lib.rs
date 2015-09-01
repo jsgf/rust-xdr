@@ -1,7 +1,13 @@
+//! XDR codec generation
+//!
+//! This crate provides library interfaces for programatically generating Rust code to implement
+//! RFC4506 XDR encoding/decoding, as well as a command line tool "xdrgen".
+//!
+//! It is intended to be used with the "xdr-codec" crate, which provides the runtime library for
+//! encoding/decoding primitive types, strings, opaque data and arrays.
 #![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
 #![plugin(peg_syntax_ext)]
 #![crate_type = "lib"]
-
 extern crate syntax;
 extern crate xdr_codec as xdr;
 
@@ -18,6 +24,10 @@ mod spec;
 use spec::{Symtab, Emit, Emitpack};
 use spec::{with_fake_extctxt, rustast, specification};
 
+/// Generate Rust code from an RFC4506 XDR specification
+///
+/// `infile` is simply a string used in error messages; it may be empty. `input` is a read stream of
+/// the specification, and `output` is where the generated code is sent.
 pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result<()>
     where In: Read, Out: Write
 {
@@ -71,6 +81,30 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
     Ok(())
 }
 
+/// Simplest possible way to generate Rust code from an XDR specification.
+///
+/// It is intended for use in a build.rs script:
+///
+/// ```ignore
+/// extern crate xdrgen;
+/// 
+/// fn main() {
+///    xdrgen::compile("src/simple.x").unwrap();
+/// }
+/// ```
+///
+/// Output is put into OUT_DIR, and can be included:
+///
+/// ```ignore
+/// mod simple {
+///    use xdr_codec;
+///    
+///    include!(concat!(env!("OUT_DIR"), "/simple_xdr.rs"));
+/// }
+/// ```
+///
+/// If your specification uses types which are not within the specification, you can provide your
+/// own implementations of `Pack` and `Unpack` for them.
 pub fn compile<P>(infile: P) -> Result<()>
     where P: AsRef<Path> + Display
 {
