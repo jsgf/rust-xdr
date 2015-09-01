@@ -1,0 +1,169 @@
+// Grammar for a .x file specifying XDR type codecs. Does not include any RPC syntax. Should match RFC4506.
+
+use super::{Value, Type, Decl, Defn, EnumDefn, UnionCase};
+
+endkw    = ![a-zA-Z0-9_] __
+
+// Keywords
+bool     = "bool" endkw
+case     = "case" endkw
+const    = "const" endkw
+default  = "default" endkw
+double   = "double" endkw
+enum     = "enum" endkw
+float    = "float" endkw
+hyper    = "hyper" endkw
+int      = "int" endkw
+opaque   = "opaque" endkw
+quadruple= "quadruple" endkw
+string   = "string" endkw
+struct   = "struct" endkw
+switch   = "switch" endkw
+typedef  = "typedef" endkw
+union    = "union" endkw
+unsigned = "unsigned" endkw
+void     = "void" endkw
+
+// Symbols
+lbrace   = "{" __
+rbrace   = "}" __
+lbrack   = "[" __
+rbrack   = "]" __
+lparen   = "(" __
+rparen   = ")" __
+lt       = "<" __
+gt       = ">" __
+star     = "*" __
+colon    = ":" __
+semi     = ";" __
+comma    = "," __
+eq       = "=" __
+
+keyword
+    = bool
+    / case
+    / const
+    / default
+    / double
+    / enum
+    / float
+    / hyper
+    / int
+    / opaque
+    / quadruple
+    / string
+    / struct
+    / switch
+    / typedef
+    / union
+    / unsigned
+    / void
+
+identifier -> String
+    = !keyword id:valid_id __		        { id }
+
+valid_id -> String
+    = [a-zA-Z_][a-zA-Z0-9_]*                    { match_str.to_string() }
+
+constant -> i64 = n:number __			{ n }
+
+number -> i64
+    = "-"? [0-9]+                               { match_str.parse().unwrap() }
+
+declaration -> Decl
+    = t:type_spec id:identifier lbrack s:value rbrack  { Decl::Named(id, Type::array(t, s)) }
+    / t:type_spec id:identifier lt s:value? gt   { Decl::Named(id, Type::flex(t, s)) }
+    / t:type_spec star id:identifier             { Decl::Named(id, Type::option(t)) }
+    / t:type_spec id:identifier                  { Decl::Named(id, t) }
+    / opaque id:identifier lbrack s:value rbrack { Decl::Named(id, Type::array(Type::Opaque, s)) }
+    / opaque id:identifier lt s:value? gt        { Decl::Named(id, Type::flex(Type::Opaque, s)) }
+    / string id:identifier lt s:value? gt        { Decl::Named(id, Type::flex(Type::String, s)) }
+    / void                                       { Decl::Void }
+
+value -> Value
+    = c:constant                { Value::Const(c) }
+    / id:identifier             { Value::Ident(id) } // XXX lookup const
+
+type_spec -> Type
+    = unsigned int              { Type::UInt }
+    / unsigned hyper            { Type::UHyper }
+    / int                       { Type::Int }
+    / hyper                     { Type::Hyper }
+    / float                     { Type::Float }
+    / double                    { Type::Double }
+    / quadruple                 { Type::Quadruple }
+    / bool                      { Type::Bool }
+    / e:enum_type_spec          { e }
+    / s:struct_type_spec        { s }
+    / u:union_type_spec         { u }
+    / id:identifier             { Type::Ident(id) }
+
+enum_type_spec -> Type
+    = enum b:enum_body          { Type::Enum(b) }
+
+enum_body -> Vec<EnumDefn>
+    =  lbrace e:enum_assign ++ comma rbrace     { e }
+
+enum_assign -> EnumDefn
+    = id:identifier v:enum_val? { EnumDefn(id, v) }
+
+enum_val -> Value
+    = eq v:value		{ v }
+    
+struct_type_spec -> Type
+    = struct s:struct_body      { Type::Struct(s) }
+
+struct_body -> Vec<Decl>
+    = lbrace s:struct_decl+ rbrace    { s }
+
+struct_decl -> Decl
+    = d:declaration semi         { d }
+
+union_type_spec -> Type
+    = union u:union_body      { Type::union(u) }
+
+union_body -> (Decl, Vec<UnionCase>, Option<Decl>)
+    = switch lparen d:declaration rparen lbrace c:union_case+ dfl:union_default? rbrace   { (d, c, dfl) }
+
+union_case -> UnionCase
+    = case v:value colon d:declaration semi      { UnionCase(v, d) }
+
+union_default -> Decl
+    = default colon d:declaration semi           { d }
+
+const_def -> Defn
+    = const id:identifier eq v:constant semi    { Defn::Const(id, v) }
+
+type_def -> (String, Type)
+    = typedef d:declaration semi               { if let Decl::Named(name, ty) = d { (name, ty) } else { return Failed } }
+    / enum id:identifier e:enum_body semi      { (id, Type::Enum(e)) }
+    / struct id:identifier s:struct_body semi  { (id, Type::Struct(s)) }
+    / union id:identifier u:union_body semi    { (id, Type::union(u)) }
+
+definition -> Defn
+    = t:type_def        { let (n, t) = t; Defn::Typedef(n, t) }
+    / c:const_def       { c }
+
+#[pub]
+specification -> Vec<Defn>
+    = directive __ d:definition*     { d }
+
+sp = (whitespace / (eol directive) / comment)
+__ = sp*
+
+comment = "/*" (!"*/" .)* "*/"
+eol = "\n" / "\r\n" / "\r" / "\u{2028}" / "\u{2029}"
+whitespace = [ \t\u{00A0}\u{FEFF}\u{1680}\u{180E}\u{2000}-\u{200A}\u{202F}\u{205F}\u{3000}]
+
+directive = (passthrough / cpreproc)*
+
+cpreproc = "#" line eol
+
+passthrough
+    = passline
+
+passline
+    = "%" whitespace* line:line eol         { /* state.env(|e| e.lines.push(line)) */ }
+
+line -> String
+    = (!eol .)*				    { match_str.to_string() }
