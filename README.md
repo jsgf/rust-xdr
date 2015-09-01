@@ -3,7 +3,8 @@ Rust XDR library
 
 This crate provides xdrgen, which takes an XDR specification in a .x
 file, and produces Rust code to serialize and deserialize the
-specified types, and
+specified types. It is intended to be used in conjunction with
+[xdr-codec](https://github.com/jsgf/rust-xdr-codec).
 
 The syntax of the .x file follows RFC4506. This has type definitions for
 XDR but does not include RPC protocol specifications. Correspondingly, xdrgen
