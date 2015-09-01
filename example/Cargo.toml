@@ -1,0 +1,15 @@
+[package]
+name = "example"
+version = "0.1.0"
+authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
+build = "build.rs"
+
+[[bin]]
+name = "simple"
+path = "src/simple.rs"
+
+[dependencies]
+xdr-codec = "*"
+
+[build-dependencies.xdrgen]
+path = ".."
