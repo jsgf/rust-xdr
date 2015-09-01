@@ -1,15 +1,18 @@
-#![feature(slice_patterns, plugin, rustc_quote, box_patterns)]
+#![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
 #![plugin(peg_syntax_ext)]
 #![crate_type = "lib"]
 
 extern crate syntax;
+extern crate xdr_codec as xdr;
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::error::Error;
 use std::fmt::Display;
 use std::env;
 
-mod xdr;
+use xdr::Result;
 
 mod spec;
 use spec::{Symtab, Emit, Emitpack};
@@ -24,7 +27,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
     let xdr = match spec::specification(&source) {
         Ok(defns) => Symtab::new(&defns),
-        Err(err) => return Err(Error::from(err)),
+        Err(err) => return Err(xdr::Error::from(err.description())),
     };
     
     with_fake_extctxt(|e| {

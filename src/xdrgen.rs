@@ -1,14 +1,14 @@
 #![feature(slice_patterns, plugin, quote, box_patterns)]
 #![crate_type = "bin"]
 
-extern crate xdr;
+extern crate xdrgen;
 
 use std::env;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::{stdin, stdout};
 
-use xdr::generate;
+use xdrgen::generate;
 
 fn print_usage(prog: &str) {
     println!("Usage: {} [file]", prog)
