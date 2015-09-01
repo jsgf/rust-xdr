@@ -319,7 +319,7 @@ impl<In: Read> Unpack<In> for bool {
 
 impl<In: Read> Unpack<In> for () {
     #[inline]
-    fn unpack(input: &mut In) -> Result<(Self, usize)> {
+    fn unpack(_input: &mut In) -> Result<(Self, usize)> {
         Ok(((), 0))
     }
 }
