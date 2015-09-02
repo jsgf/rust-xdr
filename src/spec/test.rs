@@ -79,8 +79,8 @@ fn kwishnames() {
                      "struct {}x { int i; };",
                      "struct foo { int {}x; };",
                      "typedef int {}x;",
-                     "union {}x switch (int x) { default: void; };",
-                     "union x switch (int {}x) { default: void; };",
+                     "union {}x switch (int x) { case 1: void; };",
+                     "union x switch (int {}x) { case 1: void; };",
                      "union x switch (int y) { case 1: int {}x; };",
                      ];
 
@@ -103,8 +103,8 @@ fn kwnames() {
                      "struct {} { int i; };",
                      "struct foo { int {}; };",
                      "typedef int {};",
-                     "union {} switch (int x) { default: void; };",
-                     "union x switch (int {}) { default: void; };",
+                     "union {} switch (int x) { case 1: void; };",
+                     "union x switch (int {}) { case 1: void; };",
                      "union x switch (int y) { case 1: int {}; };",
                      ];
 
@@ -148,4 +148,36 @@ fn inline_union() {
 
     let g = generate("", Cursor::new(spec.as_bytes()), Vec::new());
     assert!(g.is_err());
+}
+
+#[test]
+fn case_type() {
+    let specs = vec!["enum Foo { A, B, C }; union Bar switch (Foo x) { case A: void; case B: void; case C: void; };",
+                     "union Bar switch (int x) { case 1: void; case 2: void; case 3: void; };",
+                     ];
+
+    for sp in specs {
+        let s = grammar::specification(sp);
+        println!("spec sp \"{}\" => {:?}", sp, s);
+        assert!(s.is_ok());
+
+        let g = generate("", Cursor::new(sp.as_bytes()), Vec::new());
+        assert!(g.is_ok());
+    }
+}
+
+#[test]
+fn case_type_mismatch() {
+    let specs = vec!["enum Foo { A, B, C}; union Bar switch (Foo x) { case 1: void; case 2: void; case 3: void; };",
+                     "enum Foo { A, B, C}; union Bar switch (int x) { case A: void; case B: void; case C: void; };",
+                     ];
+
+    for sp in specs {
+        let s = grammar::specification(sp);
+        println!("spec sp \"{}\" => {:?}", sp, s);
+        assert!(s.is_ok());
+
+        let g = generate("", Cursor::new(sp.as_bytes()), Vec::new());
+        assert!(g.is_err());
+    }
 }
