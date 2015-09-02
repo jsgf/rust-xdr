@@ -419,3 +419,6 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Box<T> {
         Ok((Box::new(b), sz))
     }
 }
+
+#[cfg(test)]
+mod test;
