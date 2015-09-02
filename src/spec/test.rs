@@ -1,4 +1,6 @@
 use super::grammar;
+use super::super::generate;
+use std::io::Cursor;
 
 #[test]
 fn simple() {
@@ -70,30 +72,80 @@ typedef void;           /* syntactically defined, semantically meaningless  */
 
 #[test]
 fn kwishnames() {
-    let specs = vec!["const in = 1;",
-                     "const intt = 2;",
-                     "const intint = 3;",
-                     "struct unsignedint { int/**/foo;\n\tint\nbar; void;\n};",
+    let kws = vec!["bool", "case", "const", "default", "double", "enum", "float",
+                   "hyper", "int", "opaque", "quadruple", "string", "struct",
+                   "switch", "typedef", "union", "unsigned", "void"];
+    let specs = vec!["const {}x = 1;",
+                     "struct {}x { int i; };",
+                     "struct foo { int {}x; };",
+                     "typedef int {}x;",
+                     "union {}x switch (int x) { default: void; };",
+                     "union x switch (int {}x) { default: void; };",
+                     "union x switch (int y) { case 1: int {}x; };",
                      ];
 
-    for sp in specs {
-        let s = grammar::specification(sp);
-        println!("spec sp \"{}\" => {:?}", sp, s);
-        assert!(s.is_ok())
+    for sp in &specs {
+        for kw in &kws {
+            let spec = sp.replace("{}", kw);
+            let s = grammar::specification(&spec);
+            println!("spec {} => {:?}", spec, s);
+            assert!(s.is_ok())
+        }
     }
 }
 
 #[test]
 fn kwnames() {
-    let specs = vec!["const int = 1;",
-                     "struct void { int i; };",
-                     "struct foo { int int; };",
-                     "typedef int int;",
+    let kws = vec!["bool", "case", "const", "default", "double", "enum", "float",
+                   "hyper", "int", "opaque", "quadruple", "string", "struct",
+                   "switch", "typedef", "union", "unsigned", "void"];
+    let specs = vec!["const {} = 1;",
+                     "struct {} { int i; };",
+                     "struct foo { int {}; };",
+                     "typedef int {};",
+                     "union {} switch (int x) { default: void; };",
+                     "union x switch (int {}) { default: void; };",
+                     "union x switch (int y) { case 1: int {}; };",
                      ];
 
-    for sp in specs {
-        let s = grammar::specification(sp);
-        println!("spec {:?}", s);
-        assert!(s.is_err())
+    for sp in &specs {
+        for kw in &kws {
+            let spec = sp.replace("{}", kw);
+            let s = grammar::specification(&spec);
+            println!("spec {} => {:?}", spec, s);
+            assert!(s.is_err())
+        }
     }
+}
+
+#[test]
+fn inline_struct() {
+    let spec = r#"
+        struct thing {
+                struct { int a; int b; } thing;
+        };
+"#;
+    let s = grammar::specification(spec);
+
+    println!("spec {:?}", s);
+    assert!(s.is_ok());
+
+    let g = generate("", Cursor::new(spec.as_bytes()), Vec::new());
+    assert!(g.is_err());
+}
+
+#[test]
+fn inline_union() {
+    let spec = r#"
+        struct thing {
+                union switch(int x) { case 0: int a; case 1: int b; } thing;
+        };
+"#;
+    let s = grammar::specification(spec);
+
+    println!("spec {:?}", s);
+    assert!(s.is_ok());
+
+    let g = generate("", Cursor::new(spec.as_bytes()), Vec::new());
+    assert!(g.is_err());
 }

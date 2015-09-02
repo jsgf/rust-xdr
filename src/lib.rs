@@ -119,4 +119,3 @@ pub fn compile<P>(infile: P) -> Result<()>
 
     generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"), input, output)
 }
-

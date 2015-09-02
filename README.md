@@ -51,9 +51,6 @@ There are currently a few limitations:
      Rust code will not use normal formatting conventions.
    * It also does not filter for rust keywords, so XDR specifications intended
      for C may use identifiers like `type`.
-   * XDR allows for anonymous structures defined as part of a structure field
-     declaration, Rust syntax does not allow for this. `xdrgen` does not yet
-     autogenerate names for these structures.
    * XDR has discriminated unions, which are a good match for Rust enums.
      However, it also supports a `default` case if an unknown discriminator
      is encountered. This crate supports this for unpacking, but not for
