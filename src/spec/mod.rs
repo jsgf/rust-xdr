@@ -28,6 +28,21 @@ impl Value {
     }
 
     fn as_i64(&self, symtab: &Symtab) -> Option<i64> { symtab.value(self) }
+
+    fn as_token(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Vec<rustast::TokenTree> {
+        match self {
+            &Value::Const(c) => quote_tokens!(ctxt, $c),
+            &Value::Ident(ref id) => {
+                let tok = rustast::str_to_ident(id);
+                if let Some((_, Some(ref scope))) = symtab.getconst(id) {
+                    let scope = rustast::str_to_ident(scope);
+                    quote_tokens!(ctxt, $scope :: $tok)
+                } else {
+                    quote_tokens!(ctxt, $tok)
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -149,42 +164,15 @@ impl Type {
                 }
             },
 
-            &Array(box String, _) => quote_tokens!(ctxt, String),
-            &Array(box Opaque, ref val) => {
-                match val {
-                    &Value::Const(c) => {
-                        let c = c as usize;
-                        quote_tokens!(ctxt, [u8; $c])
-                    },
-                    &Value::Ident(ref id) => {
-                        let tok = rustast::str_to_ident(id);
-                        if let Some((_, Some(ref scope))) = symtab.getconst(id) {
-                            let scope = rustast::str_to_ident(scope);
-                            quote_tokens!(ctxt, [u8; $scope::$tok as usize])
-                        } else {
-                            quote_tokens!(ctxt, [u8; $tok as usize])
-                        }
-                    }
-                }
+            &Array(box String, ref sz) | &Array(box Opaque, ref sz) => {
+                let sztok = sz.as_token(symtab, ctxt);
+                quote_tokens!(ctxt, [u8; $sztok as usize])
             },
             
-            &Array(box ref ty, ref val) => {
+            &Array(box ref ty, ref sz) => {
                 let tytok = ty.as_token(symtab, ctxt);
-                match val {
-                    &Value::Const(c) => {
-                        let c = c as usize;
-                        quote_tokens!(ctxt, [$tytok; $c])
-                    },
-                    &Value::Ident(ref id) => {
-                        let tok = rustast::str_to_ident(id);
-                        if let Some((_, Some(ref scope))) = symtab.getconst(id) {
-                            let scope = rustast::str_to_ident(scope);
-                            quote_tokens!(ctxt, [$tytok; $scope::$tok as usize])
-                        } else {
-                            quote_tokens!(ctxt, [$tytok; $tok as usize])
-                        }
-                    }
-                }
+                let sztok = sz.as_token(symtab, ctxt);
+                quote_tokens!(ctxt, [$tytok; $sztok as usize])
             },
 
             &Flex(box String, _) => quote_tokens!(ctxt, String),
