@@ -1,3 +1,4 @@
+enum Things { A, B, C };
 struct Bar {
        opaque data<>;
 };
@@ -8,4 +9,5 @@ struct Foo {
 	Bar bar<>;
 	Bar *barish;
 	string name<>;
+	Things thing;
 };

@@ -15,7 +15,8 @@ fn main() {
         a: 1, b: 2, c: 3,
         bar: vec![simple::Bar { data: vec![1,2,3] }],
         barish: None,
-        name: String::from("foox")
+        name: String::from("foox"),
+	thing: simple::Things::C,
     };
 
     let mut buf = Vec::new();

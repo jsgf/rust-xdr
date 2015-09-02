@@ -271,7 +271,7 @@ impl Emit for Typedef {
                     .map(|(field, val)| quote_tokens!(ctxt, $field = $val,))
                     .collect();
                 
-                quote_item!(ctxt, #[derive(Debug, Eq, PartialEq)] pub enum $name { $defs }).unwrap()
+                quote_item!(ctxt, #[derive(Debug, Eq, PartialEq, Copy, Clone)] pub enum $name { $defs }).unwrap()
             },
 
             &Struct(ref decl) => {
@@ -283,7 +283,7 @@ impl Emit for Typedef {
                     .collect();
 
                 quote_item!(ctxt,
-                            #[derive(Debug,Eq,PartialEq)]
+                            #[derive(Debug, Eq, PartialEq, Clone)]
                             pub struct $name { $decls }).unwrap()
             },
 
@@ -370,7 +370,7 @@ impl Emit for Typedef {
                 }
 
                 quote_item!(ctxt,
-                            #[derive(Debug, Eq, PartialEq)]
+                            #[derive(Debug, Eq, PartialEq, Clone)]
                             pub enum $name { $cases }).unwrap()
             },
 
@@ -389,33 +389,42 @@ impl Emitpack for Typedef {
 
         let name = rustast::str_to_ident(&self.0);
         let ty = &self.1;
+        let mut directive = Vec::new();
 
         let body: Vec<rustast::TokenTree> = match ty {
-            &Enum(_) | &Ident(_) => return None,
-            _ if ty.is_prim(symtab) => return None,
+            &Enum(_) => { directive = quote_tokens!(ctxt, #[inline]); quote_tokens!(ctxt, try!((*self as i32).pack(out))) },
 
             &Struct(ref decl) => {
                 let decls: Vec<_> = decl.iter()
-                    .filter_map(|d| d.as_token(symtab, ctxt))
-                    .map(|(field, _)| quote_tokens!(ctxt, try!(self.$field.pack(out)) + ))
+                    .filter_map(|d| match d {
+                        &Void => None,
+                        &Named(ref name, ref ty) => Some((rustast::str_to_ident(name), ty)),
+                    })
+                    .map(|(field, ty)| match ty {
+                        &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&self.$field, out)) + ),
+                        _ => quote_tokens!(ctxt, try!(self.$field.pack(out)) + ),
+                    })
                     .collect();
                 quote_tokens!(ctxt, $decls 0)
             },
 
             &Union(_, ref cases, ref defl) => {
+                directive = quote_tokens!(ctxt, #[inline]);
                 let mut matches: Vec<_> = cases.iter()
                     .filter_map(|&UnionCase(ref val, ref decl)| {
                         let label = val.as_ident();
-                        let disc = match val.as_i64(symtab) {
-                            Some(v) => v as i32,
-                            None => return None
-                        };
-                        
+                        let disc = val.as_token(symtab, ctxt);
+
                         let ret = match decl {
-                            &Void => quote_tokens!(ctxt,
-                                                   $name::$label => try!($disc.pack(out)),),
-                            &Named(_, _) => quote_tokens!(ctxt,
-                                                          $name::$label(val) => try!($disc.pack(out)) + try!(val.pack(out)),),
+                            &Void =>
+                                quote_tokens!(ctxt, $name::$label => try!($disc.pack(out)),),
+                            &Named(_, ref ty) => {
+                                let pack = match ty {
+                                    &Array(_, _) => quote_tokens!(ctxt, xdr_codec::pack_array(&val, out)),
+                                    _ => quote_tokens!(ctxt, val.pack(out)),
+                                };
+                                quote_tokens!(ctxt, $name::$label(val) => try!($disc.pack(out)) + try!($pack),)
+                            },
                         };
                         Some(ret)
                     })
@@ -434,14 +443,20 @@ impl Emitpack for Typedef {
                 quote_tokens!(ctxt, match self { $matches })
             },
 
-            &Flex(_, _) | &Option(_) | &Array(_, _) =>
+            &Flex(_, _) | &Option(_) =>
                 quote_tokens!(ctxt, try!(self.pack(input))),
+
+            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&self, out))),
             
+            &Ident(_) => return None,
+            _ if ty.is_prim(symtab) => return None,
+
             _ => panic!("unimplemented ty={:?}", ty)
         };
 
         quote_item!(ctxt,
                     impl<Out: xdr_codec::Write> xdr_codec::Pack<Out> for $name {
+                        $directive
                         fn pack(&self, out: &mut Out) -> xdr_codec::Result<usize> {
                             Ok($body)
                         }
@@ -454,10 +469,37 @@ impl Emitpack for Typedef {
         
         let name = rustast::str_to_ident(&self.0);
         let ty = &self.1;
+        let mut directive = Vec::new();
 
         let body = match ty {
-            &Enum(_) | &Ident(_) => return None,
-            _ if ty.is_prim(symtab) => return None,
+            &Enum(ref defs) => {
+                directive = quote_tokens!(ctxt, #[inline]);
+                let matchdefs: Vec<_> = defs.iter()
+                    .filter_map(|&EnumDefn(ref name, _)| {
+                        let tok = rustast::str_to_ident(name);
+                        if let Some((ref val, ref scope)) = symtab.getconst(name) {
+                            if let &Some(ref scope) = scope {
+                                let scope = rustast::str_to_ident(scope);
+                                Some(quote_tokens!(ctxt, $val => $scope :: $tok,))
+                            } else {
+                                Some(quote_tokens!(ctxt, $val => $tok,))
+                            }
+                        } else {
+                            println!("unknown ident {}", name);
+                            None
+                        }
+                    })
+                    .collect();
+
+                quote_tokens!(ctxt, {
+                    let (e, esz) = try!(xdr_codec::Unpack::unpack(input));
+                    sz += esz;
+                    match e {
+                        $matchdefs
+                        _ => xdr_codec::Error::invalidenum()
+                    }
+                })
+            },
             
             &Struct(ref decl) => {
                 let decls: Vec<_> = decl.iter()
@@ -481,6 +523,7 @@ impl Emitpack for Typedef {
             },
 
             &Union(_, ref cases, ref defl) => {
+                directive = quote_tokens!(ctxt, #[inline]);
                 let mut matches: Vec<_> = cases.iter()
                     .filter_map(|&UnionCase(ref val, ref decl)| {
                         let label = val.as_ident();
@@ -525,11 +568,15 @@ impl Emitpack for Typedef {
 
             &Array(_, _) => ty.unpacker(symtab, ctxt),
 
+            &Ident(_) => return None,
+
+            _ if ty.is_prim(symtab) => return None,
             _ => panic!("unimplemented ty={:?}", ty)
         };
 
         quote_item!(ctxt,
                     impl<In: xdr_codec::Read> xdr_codec::Unpack<In> for $name {
+                        $directive
                         fn unpack(input: &mut In) -> xdr_codec::Result<($name, usize)> {
                             let mut sz = 0;
                             Ok(($body, sz))
