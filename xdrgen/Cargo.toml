@@ -17,4 +17,6 @@ doc = false
 
 [dependencies]
 peg = "0.3.2"
-xdr-codec = "0.1.0"
+
+[dependencies.xdr-codec]
+path = "../xdr-codec"
