@@ -509,7 +509,7 @@ impl Emitpack for Typedef {
                     sz += esz;
                     match e {
                         $matchdefs
-                        _ => xdr_codec::Error::invalidenum()
+                        _ => return xdr_codec::Error::invalidenum()
                     }
                 })
             },
