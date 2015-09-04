@@ -216,6 +216,14 @@ pub enum Decl {
 }
 
 impl Decl {
+    fn name_as_ident(&self) -> Option<(rustast::Ident, &Type)> {
+        use self::Decl::*;
+        match self {
+            &Void => None,
+            &Named(ref name, ref ty) => Some((rustast::str_to_ident(name), ty)),
+        }
+    }
+
     fn as_token(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<(rustast::Ident, Vec<rustast::TokenTree>)>> {
         use self::Decl::*;
         use self::Type::*;
@@ -430,13 +438,13 @@ impl Emitpack for Typedef {
 
                         let ret = match decl {
                             &Void =>
-                                quote_tokens!(ctxt, $name::$label => try!($disc.pack(out)),),
+                                quote_tokens!(ctxt, &$name::$label => try!($disc.pack(out)),),
                             &Named(_, ref ty) => {
                                 let pack = match ty {
                                     &Array(_, _) => quote_tokens!(ctxt, xdr_codec::pack_array(&val, out)),
                                     _ => quote_tokens!(ctxt, val.pack(out)),
                                 };
-                                quote_tokens!(ctxt, $name::$label(val) => try!($disc.pack(out)) + try!($pack),)
+                                quote_tokens!(ctxt, &$name::$label(ref val) => try!($disc.pack(out)) + try!($pack),)
                             },
                         };
                         Some(ret)
@@ -516,17 +524,14 @@ impl Emitpack for Typedef {
             },
 
             &Struct(ref decls) => {
-                let decls: Vec<_> = try!(fold_result(
-                    decls.iter()
-                        .filter_map(|decl| result_option(decl.as_token(symtab, ctxt))
-                                    .map(|r|
-                                         r.map(|(field, _)| {
-                                             let unpack = ty.unpacker(symtab, ctxt);
-                                             quote_tokens!(ctxt,
-                                                           $field: { let (v, fsz) = $unpack; sz += fsz; v },)
-                                         }))
-                                    )
-                        ));
+                let decls: Vec<_> = decls.iter()
+                    .filter_map(|decl| decl.name_as_ident())
+                    .map(|(field, ty)| {
+                        let unpack = ty.unpacker(symtab, ctxt);
+                        quote_tokens!(ctxt,
+                                      $field: { let (v, fsz) = $unpack; sz += fsz; v },)
+                    })
+                    .collect();
                 
                 quote_tokens!(ctxt, $name { $decls })
             },
