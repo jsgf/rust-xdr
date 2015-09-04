@@ -254,7 +254,7 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for Vec<T> {
     }
 }
 
-impl<'a, Out: Write> Pack<Out> for &'a str {
+impl<Out: Write> Pack<Out> for str {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
         self.as_bytes().pack(out)
