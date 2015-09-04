@@ -509,11 +509,11 @@ impl Emitpack for Typedef {
                     sz += esz;
                     match e {
                         $matchdefs
-                        _ => return xdr_codec::Error::invalidenum()
+                        _ => return Err(xdr_codec::Error::invalidenum())
                     }
                 })
             },
-            
+
             &Struct(ref decls) => {
                 let decls: Vec<_> = try!(fold_result(
                     decls.iter()
@@ -532,26 +532,22 @@ impl Emitpack for Typedef {
 
             &Union(_, ref cases, ref defl) => {
                 directive = quote_tokens!(ctxt, #[inline]);
-                let mut matches: Vec<_> = try!(fold_result(
-                    cases.iter()
-                        .map(|&UnionCase(ref val, ref decl)| {
-                            let label = val.as_ident();
-                            let disc = match val.as_i64(symtab) {
-                                Some(v) => v as i32,
-                                None => return Err(Error::from(format!("disc val {:?} unknown", val))),
-                            };
-                            
-                            let ret = match decl {
-                                &Void => quote_tokens!(ctxt, $disc => $name::$label,),
-                                &Named(_, _) => quote_tokens!(ctxt,
-                                                              $disc => $name::$label({
-                                                                  let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
-                                                                  sz += csz;
-                                                                  v
-                                                              }),),
-                            };
-                            Ok(ret)
-                        })));
+                let mut matches: Vec<_> = cases.iter()
+                    .map(|&UnionCase(ref val, ref decl)| {
+                        let label = val.as_ident();
+                        let disc = val.as_token(symtab, ctxt);
+
+                        match decl {
+                            &Void => quote_tokens!(ctxt, $disc => $name::$label,),
+                            &Named(_, _) => quote_tokens!(ctxt,
+                                                          $disc => $name::$label({
+                                                              let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
+                                                              sz += csz;
+                                                              v
+                                                          }),),
+                        }
+                    })
+                    .collect();
 
                 if let &Some(box ref decl) = defl {
                     let defl = match decl {
