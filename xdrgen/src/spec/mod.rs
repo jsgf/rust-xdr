@@ -362,7 +362,7 @@ impl Emit for Typedef {
                                 &Void => Ok(quote_tokens!(ctxt, $label,)),
                                 &Named(ref name, ref ty) => {
                                     let mut tok = try!(ty.as_token(symtab, ctxt));
-                                    if ty.is_boxed(symtab) {
+                                    if false && ty.is_boxed(symtab) {
                                         tok = quote_tokens!(ctxt, Box<$tok>)
                                     };
                                     if labelfields {
