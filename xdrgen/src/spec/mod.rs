@@ -457,7 +457,7 @@ impl Emitpack for Typedef {
             },
 
             &Flex(_, _) | &Option(_) =>
-                quote_tokens!(ctxt, try!(self.pack(input))),
+                quote_tokens!(ctxt, try!(self.pack(out))),
 
             &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&self, out))),
             
