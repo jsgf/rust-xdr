@@ -538,22 +538,26 @@ impl Emitpack for Typedef {
 
             &Union(_, ref cases, ref defl) => {
                 directive = quote_tokens!(ctxt, #[inline]);
-                let mut matches: Vec<_> = cases.iter()
-                    .map(|&UnionCase(ref val, ref decl)| {
-                        let label = val.as_ident();
-                        let disc = val.as_token(symtab, ctxt);
+                let mut matches: Vec<_> = try!(fold_result(
+                    cases.iter()
+                        .map(|&UnionCase(ref val, ref decl)| {
+                            let label = val.as_ident();
+                            let disc = match val.as_i64(symtab) {
+                                Some(v) => v as i32,
+                                None => return Err(Error::from(format!("disc val {:?} unknown", val))),
+                            };
 
-                        match decl {
-                            &Void => quote_tokens!(ctxt, $disc => $name::$label,),
-                            &Named(_, _) => quote_tokens!(ctxt,
-                                                          $disc => $name::$label({
-                                                              let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
-                                                              sz += csz;
-                                                              v
-                                                          }),),
-                        }
-                    })
-                    .collect();
+                            let ret = match decl {
+                                &Void => quote_tokens!(ctxt, $disc => $name::$label,),
+                                &Named(_, _) => quote_tokens!(ctxt,
+                                                              $disc => $name::$label({
+                                                                  let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
+                                                                  sz += csz;
+                                                                  v
+                                                              }),),
+                            };
+                            Ok(ret)
+                        })));
 
                 if let &Some(box ref decl) = defl {
                     let defl = match decl {
