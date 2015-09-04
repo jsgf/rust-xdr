@@ -491,6 +491,7 @@ impl Emitpack for Typedef {
                     .filter_map(|&EnumDefn(ref name, _)| {
                         let tok = rustast::str_to_ident(name);
                         if let Some((ref val, ref scope)) = symtab.getconst(name) {
+                            let val = *val as i32;
                             if let &Some(ref scope) = scope {
                                 let scope = rustast::str_to_ident(scope);
                                 Some(quote_tokens!(ctxt, $val => $scope :: $tok,))
