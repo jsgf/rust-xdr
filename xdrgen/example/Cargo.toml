@@ -8,8 +8,8 @@ build = "build.rs"
 name = "simple"
 path = "src/simple.rs"
 
-[dependencies]
-xdr-codec = "*"
+[dependencies.xdr-codec]
+path = "../../xdr-codec"
 
 [build-dependencies.xdrgen]
 path = ".."
