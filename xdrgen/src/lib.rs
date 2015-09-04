@@ -17,12 +17,65 @@ use std::io::{Read, Write};
 use std::error::Error;
 use std::fmt::Display;
 use std::env;
+use std::iter::FromIterator;
+use std::fmt::Debug;
+use std::result;
 
 use xdr::Result;
 
 mod spec;
 use spec::{Symtab, Emit, Emitpack};
 use spec::{with_fake_extctxt, rustast, specification};
+
+// Given an iterator returning results, return a result containing
+// either the first error or a an Ok collection.
+fn fold_result<I, T, E, C>(it: I) -> result::Result<C, E>
+    where I: IntoIterator<Item=result::Result<T, E>>, C: FromIterator<T>, E: Debug
+{
+    let (good, bad): (_, Vec<_>) = it.into_iter().partition(|res| res.is_ok());
+
+    let badness = bad.into_iter().fold(None, |cur, res|
+                                       match cur {
+                                           None => Some(res),
+                                           Some(v) => Some(v),
+                                       });
+
+    match badness {
+        Some(Err(b)) => Err(b),
+        Some(Ok(_)) => panic!("Ok on the bad list"),
+        None => Ok(good.into_iter().map(|r| r.unwrap()).collect()),
+    }
+}
+
+/*
+fn option_result<T, E>(optres: Option<result::Result<T, E>>) -> result::Result<Option<T>, E> {
+    match optres {
+        None => Ok(None),
+        Some(Err(e)) => Err(e),
+        Some(Ok(v)) => Ok(Some(v)),
+    }
+}
+ */
+
+fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::Result<T, E>> {
+    match resopt {
+        Ok(None) => None,
+        Ok(Some(v)) => Some(Ok(v)),
+        Err(e) => Some(Err(e)),
+    }
+}
+
+#[test]
+fn test_fold_result() {
+    let good = vec![Ok(1), Ok(2), Ok(3)];
+    assert_eq!(fold_result::<_,_,&str,_>(good), Ok(vec![1,2,3]));
+
+    let bad = vec![Ok(1), Ok(2), Err("bad")];
+    assert_eq!(fold_result::<_,_,_,Vec<u32>>(bad), Err("bad"));
+
+    let worse = vec![Ok(1), Err("worse"), Err("bad")];
+    assert_eq!(fold_result::<_,_,_,Vec<u32>>(worse), Err("worse"));
+}
 
 /// Generate Rust code from an RFC4506 XDR specification
 ///
@@ -37,7 +90,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
     let xdr = match spec::specification(&source) {
         Ok(defns) => Symtab::new(&defns),
-        Err(err) => return Err(xdr::Error::from(err.description())),
+        Err(e) => return Err(xdr::Error::from(format!("parse error: {}", e))),
     };
     
     with_fake_extctxt(|e| {
@@ -57,13 +110,13 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
         let packers = xdr.typedefs()
             .map(|(n, ty)| spec::Typedef(n.clone(), ty.clone()))
-            .filter_map(|c| c.pack(&xdr, e));
+            .filter_map(|c| result_option(c.pack(&xdr, e)));
         
         let unpackers = xdr.typedefs()
             .map(|(n, ty)| spec::Typedef(n.clone(), ty.clone()))
-            .filter_map(|c| c.unpack(&xdr, e));
+            .filter_map(|c| result_option(c.unpack(&xdr, e)));
 
-        let module = consts.chain(typedefs).chain(packers).chain(unpackers);
+        let module: Vec<_> = try!(fold_result(consts.chain(typedefs).chain(packers).chain(unpackers)));
 
         let _ = writeln!(output, r#"
 // GENERATED CODE
@@ -73,12 +126,13 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 // DO NOT EDIT
 
 "#, infile);
-        for it in module {
-            let _ = writeln!(output, "{}\n", rustast::item_to_string(&*it));
-        }
-    });
 
-    Ok(())
+        for it in module {
+          let _ = writeln!(output, "{}\n", rustast::item_to_string(&*it));
+        }
+
+        Ok(())
+    })
 }
 
 /// Simplest possible way to generate Rust code from an XDR specification.

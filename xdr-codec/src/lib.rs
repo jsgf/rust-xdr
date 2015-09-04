@@ -60,6 +60,10 @@ impl Error {
     }
 }
 
+impl From<String> for Error {
+    fn from(str: String) -> Self { Error::Generic(str) }
+}
+
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self { Error::IOError(err) }
 }
