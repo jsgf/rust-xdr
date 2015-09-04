@@ -181,3 +181,26 @@ fn case_type_mismatch() {
         assert!(g.is_err());
     }
 }
+
+#[test]
+fn constants() {
+    let specs = vec!["const A = 0;",
+                     "const A = 0x0;",
+                     "const A = 00;",
+                     "const A = -0;",
+                     "const A = 0x123;",
+                     "const A = 0123;",
+                     "const A = -0123;",
+                     "const A = 123;",
+                     "const A = -123;",
+                     ];
+
+    for sp in specs {
+        let s = grammar::specification(sp);
+        println!("spec sp \"{}\" => {:?}", sp, s);
+        assert!(s.is_ok());
+
+        let g = generate("", Cursor::new(sp.as_bytes()), Vec::new());
+        assert!(g.is_ok());
+    }
+}

@@ -60,15 +60,17 @@ keyword
     / void
 
 identifier -> String
-    = !keyword id:valid_id __		        { id }
+    = !keyword id:valid_id __		         { id }
 
 valid_id -> String
-    = [a-zA-Z_][a-zA-Z0-9_]*                    { match_str.to_string() }
+    = [a-zA-Z_][a-zA-Z0-9_]*                     { match_str.to_string() }
 
-constant -> i64 = n:number __			{ n }
+constant -> i64 = n:number __                    { n }
 
 number -> i64
-    = "-"? [0-9]+                               { match_str.parse().unwrap() }
+    = "0x" ([0-9a-fA-F]+                         { i64::from_str_radix(match_str, 16).unwrap() })
+    / "-"? "0" [0-7]*                            { i64::from_str_radix(match_str, 8).unwrap() }
+    / "-"? [1-9][0-9]*                           { match_str.parse().unwrap() }
 
 declaration -> Decl
     = t:type_spec id:identifier lbrack s:value rbrack  { Decl::Named(id, Type::array(t, s)) }
