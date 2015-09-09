@@ -20,6 +20,8 @@ use std::string;
 use std::fmt::{self, Display, Formatter};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
+pub mod record;
+
 /// A wrapper around `std::result::Result` where errors are all `xdr_codec::Error`.
 pub type Result<T> = result::Result<T, Error>;
 
@@ -46,17 +48,26 @@ impl Error {
     pub fn invalidcase() -> Error {
         Error::InvalidCase
     }
+
     pub fn invalidenum() -> Error {
         Error::InvalidEnum
     }
+
     pub fn badutf8(err: string::FromUtf8Error) -> Error {
         Error::InvalidUtf8(err)
     }
+
     pub fn byteorder(berr: byteorder::Error) -> Error {
         match berr {
             byteorder::Error::Io(ioe) => Error::IOError(ioe),
             _ => Error::Byteorder(berr),
         }
+    }
+
+    pub fn generic<T>(err: T) -> Error
+        where T: Display + error::Error
+    {
+        Error::Generic(format!("{}", err))
     }
 }
 
