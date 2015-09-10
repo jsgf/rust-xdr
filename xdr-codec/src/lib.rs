@@ -17,6 +17,7 @@ use std::borrow::Borrow;
 use std::error;
 use std::result;
 use std::string;
+use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
@@ -291,6 +292,15 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for Box<T> {
     }
 }
 
+impl<'a, Out: Write, T> Pack<Out> for Cow<'a, T>
+    where T: 'a + Pack<Out> + ToOwned<Owned=T>
+{
+    fn pack(&self, out: &mut Out) -> Result<usize> {
+        let t: &T = self.borrow();
+        t.pack(out)
+    }
+}
+
 /// Deserialization (unpacking) helper function
 ///
 /// This function will read encoded bytes from `input` (a `Read`
@@ -432,6 +442,15 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Box<T> {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
         let (b, sz) = try!(Unpack::unpack(input));
         Ok((Box::new(b), sz))
+    }
+}
+
+impl<'a, In: Read, T> Unpack<In> for Cow<'a, T>
+    where T: 'a + Unpack<In> + ToOwned<Owned=T>
+{
+    fn unpack(input: &mut In) -> Result<(Self, usize)> {
+        let (b, sz) = try!(Unpack::unpack(input));
+        Ok((Cow::Owned(b), sz))
     }
 }
 
