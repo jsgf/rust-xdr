@@ -1,54 +1,10 @@
 use std::io::{self, Read, BufRead, Write};
 use std::cmp::min;
+use byteorder;
 
 use super::{unpack, pack, Result, Error};
 
 const LAST_REC: u32 = 1u32 << 31;
-
-struct Record {
-    size: usize,                // total size of record
-    consumed: usize,            // amount of record consumed
-    eor: bool,
-}
-
-impl Record {
-    fn new<R: Read>(rd: &mut R) -> io::Result<Record> {
-        let rechdr: u32 = try!(unpack(rd).map_err(mapioerr));
-        Ok(Record {
-                size: (rechdr & !LAST_REC) as usize,
-                consumed: 0,
-                eor: (rechdr & LAST_REC) != 0,
-        })
-    }
-
-    fn totremains(&self) -> usize { self.size - self.consumed }
-
-    fn consume(&mut self, sz: usize) {
-        assert!(sz <= self.totremains());
-        self.consumed += sz;
-    }
-}
-pub struct XdrRecordReader<R: BufRead> {
-    record: Option<Record>,
-    reader: R,
-}
-
-impl<R: BufRead> XdrRecordReader<R> {
-    pub fn new(rd: R) -> XdrRecordReader<R> {
-        XdrRecordReader {
-            record: None,
-            reader: rd
-        }
-    }
-
-    pub fn eor(&self) -> bool {
-        if let Some(Record { eor, .. }) = self.record {
-            eor
-        } else {
-            true
-        }
-    }
-}
 
 fn mapioerr(xdrerr: Error) -> io::Error {
     match xdrerr {
@@ -57,33 +13,79 @@ fn mapioerr(xdrerr: Error) -> io::Error {
     }
 }
 
+pub struct XdrRecordReader<R: BufRead> {
+    size: usize,                // record size
+    consumed: usize,            // bytes consumed
+    eor: bool,                  // is last record
+
+    reader: R,                  // reader
+}
+
+impl<R: BufRead> XdrRecordReader<R> {
+    pub fn new(rd: R) -> XdrRecordReader<R> {
+        XdrRecordReader {
+            size: 0,
+            consumed: 0,
+            eor: false,
+            reader: rd
+        }
+    }
+
+    fn nextrec(&mut self) -> io::Result<bool> {
+        assert_eq!(self.consumed, self.size);
+
+        let rechdr: u32 =
+            match unpack(&mut self.reader) {
+                Ok(v) => v,
+                Err(Error::Byteorder(byteorder::Error::UnexpectedEOF)) => return Ok(true),
+                Err(e) => return Err(mapioerr(e)),
+            };
+
+        self.size = (rechdr & !LAST_REC) as usize;
+        self.consumed = 0;
+        self.eor = (rechdr & LAST_REC) != 0;
+
+        Ok(false)
+    }
+
+    fn totremains(&self) -> usize { self.size - self.consumed }
+
+    pub fn eor(&self) -> bool {
+        self.eor
+    }
+}
+
 impl<R: BufRead> Read for XdrRecordReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut record = match self.record.take() {
-            None => try!(Record::new(&mut self.reader)),
-            Some(r) =>
-                if r.totremains() == 0 {
-                    try!(Record::new(&mut self.reader))
-                } else {
-                    r
-                },
-        };
-
-        assert!(record.totremains() > 0);
-
         let nread = {
-            let data = try!(self.reader.fill_buf());
-            let len = min(data.len(), record.totremains());
+            let data = try!(self.fill_buf());
+            let len = min(buf.len(), data.len());
 
             try!((&data[..len]).read(buf))
         };
 
-        self.reader.consume(nread);
-        record.consume(nread);
-
-        self.record = Some(record);
-
+        self.consume(nread);
         Ok(nread)
+    }
+}
+
+impl<R: BufRead> BufRead for XdrRecordReader<R> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        while self.totremains() == 0 {
+            if try!(self.nextrec()) {
+                return Ok(&[])
+            }
+        }
+
+        let remains = self.totremains();
+        let data = try!(self.reader.fill_buf());
+        Ok(&data[..min(data.len(), remains)])
+    }
+
+    fn consume(&mut self, sz: usize) {
+        assert!(sz <= self.totremains());
+        self.consumed += sz;
+        self.reader.consume(sz);
     }
 }
 
@@ -151,13 +153,11 @@ impl<W: Write> Write for XdrRecordWriter<W> {
 
 #[cfg(test)]
 mod test {
-    use std::io::{Read, Write};
+    use std::io::{Read, Write, Cursor};
     use super::*;
 
     #[test]
     fn recread_full() {
-        use std::io::Cursor;
-
         let inbuf = vec![128, 0, 0, 10,  0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let cur = Cursor::new(inbuf);
 
@@ -171,8 +171,6 @@ mod test {
 
     #[test]
     fn recread_short() {
-        use std::io::Cursor;
-
         let inbuf = vec![128, 0, 0, 10,  0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let cur = Cursor::new(inbuf);
 
@@ -190,8 +188,6 @@ mod test {
 
     #[test]
     fn recread_half() {
-        use std::io::Cursor;
-
         let inbuf = vec![  0, 0, 0, 5,  0, 1, 2, 3, 4,
                            128, 0, 0, 5,  5, 6, 7, 8, 9];
         let cur = Cursor::new(inbuf);
@@ -205,6 +201,20 @@ mod test {
 
         assert_eq!(recread.read(&mut buf[..]).unwrap(), 5);
         assert_eq!(buf, vec![5,6,7,8,9, 0,0,0,0,0]);
+        assert!(recread.eor());
+    }
+
+    #[test]
+    fn read_zerorec() {
+        let inbuf = vec![0, 0, 0, 0,
+                         0, 0, 0, 0,
+                         128, 0, 0, 0];
+
+        let cur = Cursor::new(inbuf);
+        let mut recread = XdrRecordReader::new(cur);
+
+        let mut buf = [0; 100];
+        assert_eq!(recread.read(&mut buf).unwrap(), 0);
         assert!(recread.eor());
     }
 
