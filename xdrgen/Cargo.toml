@@ -20,4 +20,3 @@ peg = "0.3.3"
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"
-version = "0.1.1"
