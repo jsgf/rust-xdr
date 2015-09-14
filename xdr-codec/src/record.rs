@@ -152,7 +152,8 @@ impl<W: Write> XdrRecordWriter<W> {
         try!(pack(&rechdr, &mut self.writer).map_err(mapioerr));
         let _ = try!(self.writer.write_all(&self.buf).map(|_| ()));
         self.buf.truncate(0);
-        Ok(())
+
+        self.writer.flush()
     }
 }
 
