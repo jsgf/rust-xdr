@@ -1,0 +1,9 @@
+language: rust
+rust:
+  - nightly
+
+script:
+  - (cd xdr-codec && cargo build --verbose)
+  - (cd xdr-codec && cargo test --verbose)
+  - (cd xdrgen && cargo build --verbose)
+  - (cd xdrgen && cargo test --verbose)
