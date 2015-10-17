@@ -441,7 +441,7 @@ impl Emitpack for Typedef {
                                 quote_tokens!(ctxt, &$name::$label => try!($disc.pack(out)),),
                             &Named(_, ref ty) => {
                                 let pack = match ty {
-                                    &Array(_, _) => quote_tokens!(ctxt, xdr_codec::pack_array(&val, out)),
+                                    &Array(_, _) => quote_tokens!(ctxt, xdr_codec::pack_array(val, out)),
                                     _ => quote_tokens!(ctxt, val.pack(out)),
                                 };
                                 quote_tokens!(ctxt, &$name::$label(ref val) => try!($disc.pack(out)) + try!($pack),)
@@ -549,12 +549,10 @@ impl Emitpack for Typedef {
 
                             let ret = match decl {
                                 &Void => quote_tokens!(ctxt, $disc => $name::$label,),
-                                &Named(_, _) => quote_tokens!(ctxt,
-                                                              $disc => $name::$label({
-                                                                  let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
-                                                                  sz += csz;
-                                                                  v
-                                                              }),),
+                                &Named(_, ref ty) => {
+                                    let unpack = ty.unpacker(symtab, ctxt);
+                                    quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
+                                },
                             };
                             Ok(ret)
                         })));
