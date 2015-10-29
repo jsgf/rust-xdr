@@ -107,19 +107,23 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
             })
             .map(|c| c.define(&xdr, e));
 
-        let typedefs = xdr.typedefs()
-            .map(|(n, ty)| spec::Typedef(n.clone(), ty.clone()))
+        let typespecs = xdr.typespecs()
+            .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .map(|c| c.define(&xdr, e));
 
-        let packers = xdr.typedefs()
-            .map(|(n, ty)| spec::Typedef(n.clone(), ty.clone()))
+        let typesyns = xdr.typesyns()
+            .map(|(n, ty)| spec::Typesyn(n.clone(), ty.clone()))
+            .map(|c| c.define(&xdr, e));
+
+        let packers = xdr.typespecs()
+            .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .filter_map(|c| result_option(c.pack(&xdr, e)));
         
-        let unpackers = xdr.typedefs()
-            .map(|(n, ty)| spec::Typedef(n.clone(), ty.clone()))
+        let unpackers = xdr.typespecs()
+            .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .filter_map(|c| result_option(c.unpack(&xdr, e)));
 
-        let module: Vec<_> = try!(fold_result(consts.chain(typedefs).chain(packers).chain(unpackers)));
+        let module: Vec<_> = try!(fold_result(consts.chain(typespecs).chain(typesyns).chain(packers).chain(unpackers)));
 
         let _ = writeln!(output, r#"
 // GENERATED CODE

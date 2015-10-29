@@ -106,7 +106,7 @@ impl Type {
         match self {
             _ if self.is_prim(symtab) => false,
             &Array(_, _) | &Flex(_, _) | &Option(_) => false,
-            &Ident(ref name) => if let Some(ty) = symtab.typedef(name) { ty.is_boxed(symtab) } else { true },
+            &Ident(ref name) => if let Some(ty) = symtab.typespec(name) { ty.is_boxed(symtab) } else { true },
             _ => true,
         }
     }
@@ -120,8 +120,8 @@ impl Type {
             &Float | &Double | &Quadruple |
             &Bool       => true,
 
-            &Ident(ref id) =>
-                match symtab.typedef(id) {
+            &Ident(ref id) => 
+                match symtab.typespec(id) {
                     None => false,
                     Some(ref ty) => ty.is_prim(symtab),
                 },
@@ -158,6 +158,18 @@ impl Type {
 
         trace!("packed {:?} val {:?} => {:?}", self, val, res);
         Ok(res)
+    }
+
+    fn is_syn(&self) -> bool {
+        use self::Type::*;
+
+        match self {
+            &Opaque | &String | &Array(_, _) | &Flex(_, _) | &Option(_) |
+            &Ident(_) | &Int | &UInt | &Hyper | &UHyper | &Float | &Double |
+            &Quadruple | &Bool
+                => true,
+            _ => false,
+        }
     }
 
     fn unpacker(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Vec<rustast::TokenTree> {
@@ -283,14 +295,18 @@ impl Decl {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Typedef(pub String, pub Type);
+pub struct Typespec(pub String, pub Type);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Const(pub String, pub i64);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Typesyn(pub String, pub Type);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Defn {
-    Typedef(String, Type),
+    Typespec(String, Type),
+    Typesyn(String, Type),
     Const(String, i64),
 }
 
@@ -312,7 +328,17 @@ impl Emit for Const {
     }
 }
 
-impl Emit for Typedef {
+impl Emit for Typesyn {
+    fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
+              -> Result<rustast::P<rustast::Item>> {
+        let ty = &self.1;
+        let name = rustast::str_to_ident(&self.0);
+        let tok = try!(ty.as_token(symtab, ctxt));
+        Ok(quote_item!(ctxt, pub type $name = $tok;).unwrap())
+    }
+}
+
+impl Emit for Typespec {
     fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<rustast::P<rustast::Item>> {
         use self::Type::*;
 
@@ -417,17 +443,23 @@ impl Emit for Typedef {
                             }
                         })));
 
-
-                if let &Some(box Named(ref name, ref ty)) = defl {
-                    let mut tok = try!(ty.as_token(symtab, ctxt));
-                    if ty.is_boxed(symtab) {
-                        tok = quote_tokens!(ctxt, Box<$tok>)
-                    };
-                    if labelfields {
-                        let name = rustast::str_to_ident(name);
-                        cases.push(quote_tokens!(ctxt, default { $name: $tok },))
-                    } else {
-                        cases.push(quote_tokens!(ctxt, default($tok),))
+                if let &Some(ref def_val) = defl {
+                    match *def_val {
+                        box Named(ref name, ref ty) => {
+                            let mut tok = try!(ty.as_token(symtab, ctxt));
+                            if ty.is_boxed(symtab) {
+                                tok = quote_tokens!(ctxt, Box<$tok>)
+                            };
+                            if labelfields {
+                                let name = rustast::str_to_ident(name);
+                                cases.push(quote_tokens!(ctxt, default { $name: $tok },))
+                            } else {
+                                cases.push(quote_tokens!(ctxt, default($tok),))
+                            }
+                        },
+                        box Void => {
+                            cases.push(quote_tokens!(ctxt, default,))
+                        },
                     }
                 }
 
@@ -445,7 +477,7 @@ impl Emit for Typedef {
     }
 }
 
-impl Emitpack for Typedef {
+impl Emitpack for Typespec {
     fn pack(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<rustast::P<rustast::Item>>> {
         use self::Type::*;
         use self::Decl::*;
@@ -498,8 +530,8 @@ impl Emitpack for Typedef {
                 if let &Some(box ref decl) = defl {
                     let default =
                         match decl {
-                            &Void => quote_tokens!(ctxt, $name::default => return Err(xdr_codec::Error::invalidcase()),),
-                            &Named(_, _) => quote_tokens!(ctxt, $name::default(_) => return Err(xdr_codec::Error::invalidcase()),),
+                            &Void => quote_tokens!(ctxt, &$name::default => return Err(xdr_codec::Error::invalidcase()),),
+                            &Named(_, _) => quote_tokens!(ctxt, &$name::default(_) => return Err(xdr_codec::Error::invalidcase()),),
                         };
 
                     matches.push(default)
@@ -648,14 +680,16 @@ impl Emitpack for Typedef {
 #[derive(Debug, Clone)]
 pub struct Symtab {
     consts: BTreeMap<String, (i64, Option<String>)>,
-    typedefs: BTreeMap<String, Type>,
+    typespecs: BTreeMap<String, Type>,
+    typesyns: BTreeMap<String, Type>,
 }
 
 impl Symtab {
     pub fn new(defns: &Vec<Defn>) -> Symtab {
         let mut ret = Symtab {
             consts: BTreeMap::new(),
-            typedefs: BTreeMap::new(),
+            typespecs: BTreeMap::new(),
+            typesyns: BTreeMap::new(),
         };
 
         ret.update_consts(&defns);
@@ -666,13 +700,17 @@ impl Symtab {
     fn update_consts(&mut self, defns: &Vec<Defn>) {
         for defn in defns {
             match defn {
-                &Defn::Typedef(ref name, ref ty) => {
+                &Defn::Typespec(ref name, ref ty) => {
                     self.deftype(name, ty);
                     self.update_enum_consts(name, ty);
                 },
 
                 &Defn::Const(ref name, val) => {
                     self.defconst(name, val, None)
+                },
+
+                &Defn::Typesyn(ref name, ref ty) => {
+                    self.deftypesyn(name, ty);
                 },
             }
         }
@@ -705,7 +743,11 @@ impl Symtab {
     }
 
     fn deftype(&mut self, name: &String, ty: &Type) {
-        self.typedefs.insert(name.clone(), ty.clone());
+        self.typespecs.insert(name.clone(), ty.clone());
+    }
+
+    fn deftypesyn(&mut self, name: &String, ty: &Type) {
+        self.typesyns.insert(name.clone(), ty.clone());
     }
 
     pub fn getconst(&self, name: &String) -> Option<(i64, Option<String>)> {
@@ -722,9 +764,12 @@ impl Symtab {
         }
     }
 
-    pub fn typedef(&self, name: &String) -> Option<&Type> {
-        match self.typedefs.get(name) {
-            None => None,
+    pub fn typespec(&self, name: &String) -> Option<&Type> {
+        match self.typespecs.get(name) {
+            None => match self.typesyns.get(name) {
+                None => None,
+                Some(ty) => Some(ty),
+            },
             Some(ty) => Some(ty),
         }
     }
@@ -733,8 +778,12 @@ impl Symtab {
         self.consts.iter()
     }
 
-    pub fn typedefs(&self) -> Iter<String, Type> {
-        self.typedefs.iter()
+    pub fn typespecs(&self) -> Iter<String, Type> {
+        self.typespecs.iter()
+    }
+
+    pub fn typesyns(&self) -> Iter<String, Type> {
+        self.typesyns.iter()
     }
 }
 

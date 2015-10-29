@@ -136,14 +136,17 @@ union_default -> Decl
 const_def -> Defn
     = const id:identifier eq v:constant semi    { Defn::Const(id, v) }
 
-type_def -> (String, Type)
-    = typedef d:declaration semi               { if let Decl::Named(name, ty) = d { (name, ty) } else { return Failed } }
-    / enum id:identifier e:enum_body semi      { (id, Type::Enum(e)) }
-    / struct id:identifier s:struct_body semi  { (id, Type::Struct(s)) }
-    / union id:identifier u:union_body semi    { (id, Type::union(u)) }
+type_def -> Defn
+    = typedef d:declaration semi               { if let Decl::Named(name, ty) = d {
+                                                    if ty.is_syn() { Defn::Typesyn(name, ty) }
+                                                    else { Defn::Typespec(name, ty) }
+                                                 } else { return Failed } }
+    / enum id:identifier e:enum_body semi      { Defn::Typespec(id, Type::Enum(e)) }
+    / struct id:identifier s:struct_body semi  { Defn::Typespec(id, Type::Struct(s)) }
+    / union id:identifier u:union_body semi    { Defn::Typespec(id, Type::union(u)) }
 
 definition -> Defn
-    = t:type_def        { let (n, t) = t; Defn::Typedef(n, t) }
+    = t:type_def        { t }
     / c:const_def       { c }
 
 #[pub]

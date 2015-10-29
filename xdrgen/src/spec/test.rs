@@ -204,3 +204,32 @@ fn constants() {
         assert!(g.is_ok());
     }
 }
+
+#[test]
+fn union_default() {
+    let s = grammar::specification(r#"
+union foo switch (int x) {
+case 0:
+    int val;
+default:
+    void;
+};
+"#);
+    println!("spec {:?}", s);
+    assert!(s.is_ok())
+}
+
+#[test]
+fn union_default_nonempty() {
+    let s = grammar::specification(r#"
+union foo switch (int x) {
+case 0:
+    int val;
+default:
+    bool bye;
+};
+"#);
+    println!("spec {:?}", s);
+    assert!(s.is_ok())
+
+}
