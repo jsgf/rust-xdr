@@ -1,6 +1,6 @@
 [package]
 name = "xdrgen"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT"
 description = "XDR codec generator from specification and runtime library"
@@ -17,9 +17,9 @@ doc = false
 
 [dependencies]
 peg = "0.3.3"
-log = "*"
-env_logger = "*"
+log = "0.3"
+env_logger = "0.3"
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"
-version = "0.1.5"
+version = "0.1.6"
