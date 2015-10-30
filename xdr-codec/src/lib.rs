@@ -41,6 +41,8 @@ pub enum Error {
     InvalidCase,
     /// Decoding a bad enum value
     InvalidEnum,
+    /// Array/String too long
+    InvalidLen,
     /// Generic error.
     Generic(String),
 }
@@ -52,6 +54,10 @@ impl Error {
 
     pub fn invalidenum() -> Error {
         Error::InvalidEnum
+    }
+
+    pub fn invalidlen() -> Error {
+        Error::InvalidLen
     }
 
     pub fn badutf8(err: string::FromUtf8Error) -> Error {
@@ -109,6 +115,7 @@ impl error::Error for Error {
             &Error::Generic(ref s) => s,
             &Error::InvalidCase => "invalid switch case",
             &Error::InvalidEnum => "invalid enum value",
+            &Error::InvalidLen => "invalid string/array length",
         }
     }
 

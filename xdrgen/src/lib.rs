@@ -11,6 +11,9 @@
 extern crate syntax;
 extern crate xdr_codec as xdr;
 
+#[macro_use]
+extern crate log;
+
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::{Read, Write};

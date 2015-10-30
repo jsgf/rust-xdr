@@ -2,6 +2,7 @@
 #![crate_type = "bin"]
 
 extern crate xdrgen;
+extern crate env_logger;
 
 use std::env;
 use std::fs::File;
@@ -16,26 +17,28 @@ fn print_usage(prog: &str) {
 }
 
 fn main() {
+    let _ = env_logger::init();
+
     let args: Vec<_> = env::args_os().collect();
     let progname = args[0].to_str().unwrap();
     let output = stdout();
     let mut err = stderr();
 
     match &args[1..] {
-	[ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
-	[ref fname] => {
+        [ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
+        [ref fname] => {
             match generate(fname.as_os_str().to_str().unwrap_or("<unknown>"),
                            BufReader::new(File::open(fname).unwrap()), output) {
                 Ok(()) => (),
                 Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },
             }
         },
-	[] => {
+        [] => {
             match generate("stdin", BufReader::new(stdin()), output) {
                 Ok(()) => (),
                 Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },
             }
         },
-	_ => return print_usage(progname),
+        _ => return print_usage(progname),
     };
 }
