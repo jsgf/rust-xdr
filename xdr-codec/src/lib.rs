@@ -149,9 +149,9 @@ pub fn pack<Out: Write, T: Pack<Out>>(val: &T, out: &mut Out) -> Result<()> {
     val.pack(out).map(|_| ())
 }
 
-// Pack a fixed-size array.
-//
-// As the size is fixed, it doesn't need to be encoded.
+/// Pack a fixed-size array.
+///
+/// As the size is fixed, it doesn't need to be encoded.
 pub fn pack_array<Out: Write, T: Pack<Out>>(val: &[T], out: &mut Out) -> Result<usize> {
     let mut vsz = 0;
     for v in val {
@@ -164,6 +164,35 @@ pub fn pack_array<Out: Write, T: Pack<Out>>(val: &[T], out: &mut Out) -> Result<
     }
 
     Ok(vsz + psz)
+}
+
+/// Unpack a length-limited array
+pub fn unpack_flex_array<In: Read, T: Unpack<In>>(input: &mut In, maxsz: usize) -> Result<(Vec<T>, usize)> {
+    let (elems, mut sz) = try!(Unpack::unpack(input));
+
+    if elems > maxsz {
+        return Err(Error::InvalidLen)
+    }
+
+    let mut out = Vec::with_capacity(elems);
+
+    for _ in 0..elems {
+        let (e, esz) = try!(Unpack::unpack(input));
+        out.push(e);
+        sz += esz;
+    }
+    for _ in 0..padding(sz) {
+        let (_, psz): (u8, _) = try!(Unpack::unpack(input));
+        sz += psz;
+    }
+
+    Ok((out, sz))
+}
+
+/// Unpack length-limited string
+pub fn unpack_string<In: Read>(input: &mut In, maxsz: usize) -> Result<(String, usize)> {
+    let (v, sz) = try!(unpack_flex_array(input, maxsz));
+    String::from_utf8(v).map_err(Error::from).map(|s| (s, sz))
 }
 
 /// Basic packing trait.

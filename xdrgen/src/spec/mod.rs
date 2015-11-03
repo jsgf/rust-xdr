@@ -120,7 +120,7 @@ impl Type {
             &Float | &Double | &Quadruple |
             &Bool       => true,
 
-            &Ident(ref id) => 
+            &Ident(ref id) =>
                 match symtab.typespec(id) {
                     None => false,
                     Some(ref ty) => ty.is_prim(symtab),
@@ -190,17 +190,15 @@ impl Type {
                 quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
             },
 
-            &Flex(ref ty, Some(ref maxsz)) => {
-                let ty = ty.as_token(symtab, ctxt).unwrap();
+
+            &Flex(box String, Some(ref maxsz)) => {
                 let maxsz = maxsz.as_token(symtab, ctxt);
-                quote_tokens!(ctxt, {
-                    let (v, sz): ($ty, usize) = try!(xdr_codec::Unpack::unpack(input));
-                    if v.len() > ($maxsz as usize) {
-                        return Err(xdr_codec::Error::invalidlen())
-                    } else {
-                        (v, sz)
-                    }
-                })
+                quote_tokens!(ctxt, try!(xdr_codec::unpack_string(input, $maxsz as usize)))
+            },
+
+            &Flex(_, Some(ref maxsz)) => {
+                let maxsz = maxsz.as_token(symtab, ctxt);
+                quote_tokens!(ctxt, try!(xdr_codec::unpack_flex_array(input, $maxsz as usize)))
             },
 
             _ => quote_tokens!(ctxt, try!(xdr_codec::Unpack::unpack(input))),
