@@ -107,3 +107,68 @@ default:
         panic!("test {} failed: {}", name, e);
     }
 }
+
+#[test]
+fn simple() {
+    let name = "simple";
+    let specs = vec!["struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper hyperfoo; };",
+                     "const blop = 123;",
+                     "typedef opaque Ioaddr<>;"
+                     ];
+
+    for (i, spec) in specs.into_iter().enumerate() {
+        let name = format!("{}_{}", name, i);
+
+        if let Err(e) = build_test(&name, spec) {
+            panic!("test {} failed: {}", name, e);
+        }
+    }
+}
+
+#[test]
+fn rfc4506() {
+    let name = "rfc4506";
+    let spec = r#"
+
+         const MAXUSERNAME = 32;     /* max length of a user name */
+         const MAXFILELEN = 65535;   /* max length of a file      */
+         const MAXNAMELEN = 255;     /* max length of a file name */
+
+         /*
+          * Types of files:
+          */
+         enum filekind {
+            TEXT = 0,       /* ascii data */
+            DATA = 1,       /* raw data   */
+            EXEC = 2        /* executable */
+         };
+
+         /*
+          * File information, per kind of file:
+          */
+         union filetype switch (filekind kind) {
+         case TEXT:
+            void;                           /* no extra information */
+         case DATA:
+            string creator<MAXNAMELEN>;     /* data creator         */
+         case EXEC:
+            string interpretor<MAXNAMELEN>; /* program interpretor  */
+         };
+
+         /*
+          * A complete file:
+          */
+         struct file {
+            string filename<MAXNAMELEN>; /* name of file    */
+            filetype type_;              /* info about file */
+            string owner<MAXUSERNAME>;   /* owner of file   */
+            opaque data<MAXFILELEN>;     /* file data       */
+         };
+"#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
+    
+

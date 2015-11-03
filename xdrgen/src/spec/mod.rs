@@ -144,7 +144,7 @@ impl Type {
             &Flex(_, Some(ref maxsz)) => {
                 let maxsz = maxsz.as_token(symtab, ctxt);
                 quote_tokens!(ctxt,
-                              if $val.len() > $maxsz {
+                              if $val.len() > ($maxsz as usize) {
                                   return Err(xdr_codec::Error::invalidlen())
                               } else {
                                   try!($val.pack(out))
@@ -190,11 +190,12 @@ impl Type {
                 quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
             },
 
-            &Flex(_, Some(ref maxsz)) => {
+            &Flex(ref ty, Some(ref maxsz)) => {
+                let ty = ty.as_token(symtab, ctxt).unwrap();
                 let maxsz = maxsz.as_token(symtab, ctxt);
                 quote_tokens!(ctxt, {
-                    let (v, sz) = try!(xdr_codec::Unpack::unpack(input));
-                    if v.len() > $maxsz {
+                    let (v, sz): ($ty, usize) = try!(xdr_codec::Unpack::unpack(input));
+                    if v.len() > ($maxsz as usize) {
                         return Err(xdr_codec::Error::invalidlen())
                     } else {
                         (v, sz)
@@ -218,6 +219,9 @@ impl Type {
             &Double     => quote_tokens!(ctxt, f64),
             &Quadruple  => quote_tokens!(ctxt, f128),
             &Bool       => quote_tokens!(ctxt, bool),
+
+            &String     => quote_tokens!(ctxt, String),
+            &Opaque     => quote_tokens!(ctxt, Vec<u8>),
 
             &Option(box ref ty) => {
                 let tok = try!(ty.as_token(symtab, ctxt));
