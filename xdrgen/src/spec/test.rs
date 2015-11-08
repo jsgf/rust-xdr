@@ -175,3 +175,18 @@ default:
     assert!(s.is_ok())
 
 }
+
+#[test]
+fn fallthrough_case() {
+    let s = grammar::specification(r#"
+union foo switch (int x) {
+  case 0:
+  case 1:
+       int val;
+  case 2:
+       void;
+};
+"#);
+    println!("spec {:?}", s);
+    assert!(s.is_ok())
+}

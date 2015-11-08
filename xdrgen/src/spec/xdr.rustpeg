@@ -125,10 +125,22 @@ union_type_spec -> Type
     = union u:union_body      { Type::union(u) }
 
 union_body -> (Decl, Vec<UnionCase>, Option<Decl>)
-    = switch lparen d:declaration rparen lbrace c:union_case+ dfl:union_default? rbrace   { (d, c, dfl) }
+    = switch lparen d:declaration rparen lbrace ucss:union_case+ dfl:union_default? rbrace
+                    { let mut ucases = vec![];
+                      for ucs in ucss.clone().iter_mut() {
+                          ucases.append(ucs);
+                      }
+                      (d, ucases, dfl) }
 
-union_case -> UnionCase
-    = case v:value colon d:declaration semi      { UnionCase(v, d) }
+union_case -> Vec<UnionCase>
+    = vs:union_case_value+ d:declaration semi      { let mut ucs = vec![];
+                                                     for v in vs {
+                                                         ucs.push(UnionCase(v, d.clone()));
+                                                     }
+                                                     ucs }
+
+union_case_value -> Value
+    = case v:value colon                         { v }
 
 union_default -> Decl
     = default colon d:declaration semi           { d }
