@@ -95,8 +95,8 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
         Ok(defns) => Symtab::new(&defns),
         Err(e) => return Err(xdr::Error::from(format!("parse error: {}", e))),
     };
-    
-    with_fake_extctxt(|e| {
+
+    let res: Result<Vec<_>> = with_fake_extctxt(|e| {
         let consts = xdr.constants()
             .filter_map(|(c, &(v, ref scope))| {
                 if scope.is_none() {
@@ -118,14 +118,19 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
         let packers = xdr.typespecs()
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .filter_map(|c| result_option(c.pack(&xdr, e)));
-        
+
         let unpackers = xdr.typespecs()
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .filter_map(|c| result_option(c.unpack(&xdr, e)));
 
         let module: Vec<_> = try!(fold_result(consts.chain(typespecs).chain(typesyns).chain(packers).chain(unpackers)));
 
-        let _ = writeln!(output, r#"
+        Ok(module.iter().map(|it| rustast::item_to_string(it)).collect())
+    });
+
+    let res = try!(res);
+
+    let _ = writeln!(output, r#"
 // GENERATED CODE
 //
 // Generated from {}.
@@ -134,12 +139,11 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
 "#, infile);
 
-        for it in module {
-          let _ = writeln!(output, "{}\n", rustast::item_to_string(&*it));
-        }
+    for it in res {
+        let _ = writeln!(output, "{}\n", it);
+    }
 
-        Ok(())
-    })
+    Ok(())
 }
 
 /// Simplest possible way to generate Rust code from an XDR specification.
@@ -148,7 +152,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 ///
 /// ```ignore
 /// extern crate xdrgen;
-/// 
+///
 /// fn main() {
 ///    xdrgen::compile("src/simple.x").unwrap();
 /// }
@@ -159,7 +163,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 /// ```ignore
 /// mod simple {
 ///    use xdr_codec;
-///    
+///
 ///    include!(concat!(env!("OUT_DIR"), "/simple_xdr.rs"));
 /// }
 /// ```
@@ -175,7 +179,7 @@ pub fn compile<P>(infile: P) -> Result<()>
     let outfile = PathBuf::from(infile.as_ref()).file_stem().unwrap().to_owned().into_string().unwrap().replace("-", "_");
 
     outdir.push(&format!("{}_xdr.rs", outfile));
-    
+
     let output = try!(File::create(outdir));
 
     generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"), input, output)
