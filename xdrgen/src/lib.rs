@@ -6,13 +6,15 @@
 //! It is intended to be used with the "xdr-codec" crate, which provides the runtime library for
 //! encoding/decoding primitive types, strings, opaque data and arrays.
 #![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
-#![plugin(peg_syntax_ext)]
 #![crate_type = "lib"]
 extern crate syntax;
 extern crate xdr_codec as xdr;
 
 #[macro_use]
 extern crate log;
+
+#[macro_use]
+extern crate nom;
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -28,7 +30,7 @@ use xdr::Result;
 
 mod spec;
 use spec::{Symtab, Emit, Emitpack};
-use spec::{with_fake_extctxt, rustast, specification};
+use spec::{with_fake_extctxt, rustast};
 
 // Given an iterator returning results, return a result containing
 // either the first error or a an Ok collection.

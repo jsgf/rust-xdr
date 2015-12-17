@@ -1,10 +1,10 @@
-use super::grammar;
+use super::specification;
 use super::super::generate;
 use std::io::Cursor;
 
 #[test]
 fn typedef_void() {
-    let s = grammar::specification(r#"
+    let s = specification(r#"
 typedef void;           /* syntactically defined, semantically meaningless  */
 "#);
 
@@ -29,7 +29,7 @@ fn kwishnames() {
     for sp in &specs {
         for kw in &kws {
             let spec = sp.replace("{}", kw);
-            let s = grammar::specification(&spec);
+            let s = specification(&spec);
             println!("spec {} => {:?}", spec, s);
             assert!(s.is_ok())
         }
@@ -53,7 +53,7 @@ fn kwnames() {
     for sp in &specs {
         for kw in &kws {
             let spec = sp.replace("{}", kw);
-            let s = grammar::specification(&spec);
+            let s = specification(&spec);
             println!("spec {} => {:?}", spec, s);
             assert!(s.is_err())
         }
@@ -67,7 +67,7 @@ fn inline_struct() {
                 struct { int a; int b; } thing;
         };
 "#;
-    let s = grammar::specification(spec);
+    let s = specification(spec);
 
     println!("spec {:?}", s);
     assert!(s.is_ok());
@@ -83,7 +83,7 @@ fn inline_union() {
                 union switch(int x) { case 0: int a; case 1: int b; } thing;
         };
 "#;
-    let s = grammar::specification(spec);
+    let s = specification(spec);
 
     println!("spec {:?}", s);
     assert!(s.is_ok());
@@ -99,7 +99,7 @@ fn case_type() {
                      ];
 
     for sp in specs {
-        let s = grammar::specification(sp);
+        let s = specification(sp);
         println!("spec sp \"{}\" => {:?}", sp, s);
         assert!(s.is_ok());
 
@@ -115,7 +115,7 @@ fn case_type_mismatch() {
                      ];
 
     for sp in specs {
-        let s = grammar::specification(sp);
+        let s = specification(sp);
         println!("spec sp \"{}\" => {:?}", sp, s);
         assert!(s.is_ok());
 
@@ -138,7 +138,7 @@ fn constants() {
                      ];
 
     for sp in specs {
-        let s = grammar::specification(sp);
+        let s = specification(sp);
         println!("spec sp \"{}\" => {:?}", sp, s);
         assert!(s.is_ok());
 
@@ -149,7 +149,7 @@ fn constants() {
 
 #[test]
 fn union_default() {
-    let s = grammar::specification(r#"
+    let s = specification(r#"
 union foo switch (int x) {
 case 0:
     int val;
@@ -163,7 +163,7 @@ default:
 
 #[test]
 fn union_default_nonempty() {
-    let s = grammar::specification(r#"
+    let s = specification(r#"
 union foo switch (int x) {
 case 0:
     int val;
@@ -178,7 +178,7 @@ default:
 
 #[test]
 fn fallthrough_case() {
-    let s = grammar::specification(r#"
+    let s = specification(r#"
 union foo switch (int x) {
   case 0:
   case 1:

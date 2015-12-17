@@ -16,9 +16,9 @@ bench = false
 doc = false
 
 [dependencies]
-peg = "0.3.3"
 log = "0.3"
 env_logger = "0.3"
+nom = "~1.0.0"
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"

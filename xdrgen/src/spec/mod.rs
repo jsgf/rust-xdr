@@ -9,17 +9,17 @@ use std::result;
 
 pub mod rustast;
 mod fake_extctxt;
+mod xdr_nom;
 
 pub use self::fake_extctxt::with_fake_extctxt;
-pub use self::grammar::{ParseError, specification};
 
 use xdr::Error;
-
-peg_file! grammar("xdr.rustpeg");
 
 use super::{fold_result, result_option};
 
 pub type Result<T> = result::Result<T, Error>;
+
+pub use self::xdr_nom::specification;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
