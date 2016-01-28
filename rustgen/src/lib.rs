@@ -33,6 +33,16 @@ impl<'a, T: Tokenize> From<&'a T> for Tokens {
     fn from(t: &'a T) -> Self { t.tokens() }
 }
 
+impl Display for Tokens {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        for t in &self.0 {
+            try!(write!(fmt, "{}", t));
+        }
+        Ok(())
+    }
+}
+
+
 impl From<Vec<Tokens>> for Tokens {
     fn from(v: Vec<Tokens>) -> Tokens { v.into_iter().flatten().collect() }
 }
@@ -87,16 +97,6 @@ fn option<P, O>(pfx: &P, opt: &Option<O>) -> Tokens
     where P: Tokenize, O: Tokenize
 {
     opt.as_ref().map_or(Tokens::nil(), |t| Tokens::from(pfx) + t)
-}
-
-pub fn to_string<T: Tokenize>(toks: T) -> String {
-    use std::fmt::Write;
-
-    let mut s = String::new();
-    for t in toks.tokens() {
-        write!(&mut s, "{}", t).unwrap()
-    }
-    s
 }
 
 fn flatten<IIT, IT, T>(iit: IIT) -> IT
@@ -218,7 +218,8 @@ pub enum Symbol {
     Bar,                        // '|'
     Ref,                        // '&'
     Plus,                       // '+'
-
+    Tick,                       // '\''
+    
     Assign,                     // '='
     AssignOp(BinOp),            // #'='
 }
@@ -253,6 +254,7 @@ impl Display for Symbol {
             Bar => "|",
             Ref => "&",
             Plus => "+",
+            Tick => "'",
 
             AssignOp(Add) => "+=",
             AssignOp(Sub) => "-=",
@@ -277,6 +279,9 @@ impl Tokenize for Symbol {
 // Subset of used keywords
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum Keyword {
+    Extern,                     // "extern"
+    Crate,                      // "crate"
+
     Type,                       // "type"
     Struct,                     // "struct"
     Enum,                       // "enum"
@@ -296,7 +301,10 @@ pub enum Keyword {
     Mut,                        // "mut"
     Ref,                        // "ref"
     Move,                       // "move"
+    Selfkw,                     // "self"
 
+    Isize,                      // "isize"
+    Usize,                      // "usize"
     U64,                        // "u64"
     I64,                        // "i64"
     U32,                        // "u32"
@@ -315,6 +323,9 @@ impl Display for Keyword {
         use Keyword::*;
 
         let s = match *self {
+            Extern => "extern",
+            Crate => "crate",
+            
             Type => "type",
             Struct => "struct",
             Enum => "enum",
@@ -334,8 +345,11 @@ impl Display for Keyword {
             Mut => "mut",
             Ref => "ref",
             Move => "move",
+            Selfkw => "self",
 
             // Primitive types
+            Usize => "usize",
+            Isize => "isize",
             U64 => "u64",
             I64 => "i64",
             U32 => "u32",
@@ -764,7 +778,7 @@ pub enum Type {
     Struct(Ident, Vec<(Vis, Ident, Type)>),
     TupleStruct(Ident, Vec<(Vis, Type)>),
     Enum(Ident, Vec<EnumField>),
-    Param(TypeParam),    // type parameter with constraints
+    Param(Box<Type>, TypeMatch),    // type with type parameters with constraints
 }
 
 impl Type {
@@ -787,7 +801,7 @@ impl Type {
 
             &Tuple(ref tup) => parens(commas(tup.iter().map(|t| t.reference()))),
 
-            &Param(ref param) => param.reference(),
+            &Param(ref ty, ref param) => ty.reference() + param,
 
             &Type(ref id, _) |
             &Struct(ref id, _) |
@@ -840,22 +854,6 @@ impl Type {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct TypeParam(Ident, Vec<Type>);
-
-impl TypeParam {
-    fn reference(&self) -> Tokens { Tokens::from(&self.0) }
-    fn define(&self) -> Tokens {
-        Tokens::from(&self.0) + &Symbol::Colon + &sep(Symbol::Plus, self.1.iter().map(|t| t.reference()))
-    }
-}
-
-impl Tokenize for Vec<TypeParam> {
-    fn tokens(&self) -> Tokens {
-        wrap(Symbol::Ltbrack, commas(self.iter().map(|t| t.define())), Symbol::Gtbrack)
-    }
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum EnumField {
     Unit(Ident),
     Tuple(Ident, Vec<Type>),
@@ -891,9 +889,67 @@ impl Tokenize for EnumField {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
+pub enum TypeBound {
+    Type(Path),                 // A
+    Trait(Path, TypeMatch),     // Trait<'a,A,_,C>
+    Lifetime(Ident),            // 'a
+    Any,                        // _
+}
+
+impl Tokenize for TypeBound {
+    fn tokens(&self) -> Tokens {
+        use TypeBound::*;
+        
+        match self {
+            &Type(ref path) => path.tokens(),
+            &Trait(ref path, ref tymatch) => path.tokens() + tymatch,
+            &Lifetime(ref id) => Tokens::from(&Symbol::Tick) + id,
+            &Any => Tokens::from(&Symbol::Wildcard),
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct TypeMatch(Vec<TypeBound>);
+
+impl Tokenize for TypeMatch {
+    fn tokens(&self) -> Tokens {
+        if self.0.len() == 0 { Tokens::nil() }
+        else { wrap(Symbol::Ltbrack, commas(self.0.iter().map(Tokens::from)), Symbol::Gtbrack) }
+    }
+}
+
+// impl<T, U, V> Foo where T: 'a + Thing, U: , V: Foo<U>
+// struct Foo<U> { a: U }
+// fn foo<A, B: Bar, C: Vec<_>>(a: A, b: &B) -> C
+// foo.bar::<Vec<_>>
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct TypeParam(TypeBound, Vec<TypeBound>);
+
+impl TypeParam {
+    fn reference(&self) -> Tokens { Tokens::from(&self.0) }
+    fn define(&self) -> Tokens {
+        Tokens::from(&self.0) +
+            &if self.1.len() == 0 {
+                Tokens::nil()
+            } else {
+                Tokens::from(&Symbol::Colon) + &sep(Symbol::Plus, self.1.iter().map(|t| t.tokens()))
+            }
+    }
+}
+
+impl Tokenize for Vec<TypeParam> {
+    fn tokens(&self) -> Tokens {
+        wrap(Symbol::Ltbrack, commas(self.iter().map(|t| t.define())), Symbol::Gtbrack)
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Items {
     Mod(Ident, Option<Vec<Item>>),
-    Fn(Ident, Option<Vec<TypeParam>>, Vec<Pattern>, Option<Type>, Block),
+    Extern(Path, Option<Ident>),
+    Fn(Ident, Option<Vec<TypeParam>>, Vec<Arg>, Option<Type>, Block),
     Type(Type),
 }
 
@@ -907,6 +963,8 @@ impl Tokenize for Items {
                     &None => Tokens::from(&Symbol::Semi),
                     &Some(ref defs) => braces(defs.iter().map(Tokens::from).collect()),
                 },
+            &Extern(ref p, ref asname) => Tokens::from(p) + &option(&Keyword::As, asname),
+
             &Type(ref ty) => ty.define(),
             &Fn(ref name, ref typeparam, ref args, ref ret, ref body) =>
                 Tokens::from(&Keyword::Fn) + name +
@@ -916,6 +974,25 @@ impl Tokenize for Items {
                 body,
         }
         
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum Arg {
+    SelfVal,
+    SelfRef(bool),
+    Arg(Pattern, Type),
+}
+
+impl Tokenize for Arg {
+    fn tokens(&self) -> Tokens {
+        use Arg::*;
+
+        match self {
+            &SelfVal => Tokens::from(&Keyword::Selfkw),
+            &SelfRef(ismut) => (if ismut { Tokens::from(&Keyword::Mut) } else { Tokens::nil() }) + &Keyword::Ref + &Keyword::Selfkw,
+            &Arg(ref pat, ref ty) => Tokens::from(pat) + &Symbol::Colon + &ty.reference(),
+        }
     }
 }
 
@@ -960,30 +1037,30 @@ mod test {
     #[test]
     fn type_simple() {
         assert_eq!(Type::U8.reference(), from(&Keyword::U8));
-        assert_eq!(to_string(Type::U8.reference()), "u8 ");
+        assert_eq!(Type::U8.reference().to_string(), "u8 ");
     }
 
     #[test]
     fn type_struct() {
-        assert_eq!(to_string(Type::Struct(Ident::new("foo"), vec![(Vis::Public, Ident::new("bar"), Type::U8)]).define()),
+        assert_eq!(Type::Struct(Ident::new("foo"), vec![(Vis::Public, Ident::new("bar"), Type::U8)]).define().to_string(),
                    "struct foo { pub bar : u8 , } ");
-        assert_eq!(to_string(Type::Struct(Ident::new("foo"), vec![(Vis::Private, Ident::new("bar"), Type::U8)]).define()),
+        assert_eq!(Type::Struct(Ident::new("foo"), vec![(Vis::Private, Ident::new("bar"), Type::U8)]).define().to_string(),
                    "struct foo { bar : u8 , } ");
-        assert_eq!(to_string(Type::Struct(Ident::new("foo"), vec![(Vis::Public, Ident::new("bar"), Type::U8)]).reference()),
+        assert_eq!(Type::Struct(Ident::new("foo"), vec![(Vis::Public, Ident::new("bar"), Type::U8)]).reference().to_string(),
                    "foo ");
 
-        assert_eq!(to_string(Type::TupleStruct(Ident::new("foo"), vec![(Vis::Private, Type::U8)]).define()),
+        assert_eq!(Type::TupleStruct(Ident::new("foo"), vec![(Vis::Private, Type::U8)]).define().to_string(),
                    "struct foo ( u8 ) ; ");
     }
 
     #[test]
     fn type_enum() {
-        assert_eq!(to_string(Type::Enum(Ident::new("foo"),
-                                        vec![EnumField::Unit(Ident::new("Bar")),
-                                             EnumField::Tuple(Ident::new("Boff"), vec![Type::U8, Type::F32]),
-                                             EnumField::Struct(Ident::new("Bonk"), vec![(Ident::new("blop"), Type::I32),
-                                                                                        (Ident::new("flop"), Type::Unit)]),
-                                             EnumField::Const(Ident::new("Thing"), Expr::Literal(Literal::Bool(false)))]).define()),
+        assert_eq!(Type::Enum(Ident::new("foo"),
+                              vec![EnumField::Unit(Ident::new("Bar")),
+                                   EnumField::Tuple(Ident::new("Boff"), vec![Type::U8, Type::F32]),
+                                   EnumField::Struct(Ident::new("Bonk"), vec![(Ident::new("blop"), Type::I32),
+                                                                              (Ident::new("flop"), Type::Unit)]),
+                                   EnumField::Const(Ident::new("Thing"), Expr::Literal(Literal::Bool(false)))]).define().to_string(),
                    "enum foo { Bar , Boff ( u8 , f32 ) , Bonk { blop : i32 , flop : () } , Thing = false } ");
     }
 
@@ -1011,7 +1088,7 @@ mod test {
             ];
 
         for &(ref p, ref s) in &patterns {
-            assert_eq!(to_string(p.tokens()), *s)
+            assert_eq!(p.tokens().to_string(), *s)
         }
     }
 
@@ -1025,7 +1102,7 @@ mod test {
                                                                        vec![(Ident::new("foo"), Ref(false, Ident::new("a")))], true)],
                                                  pred: None },
                                   Expr::Ident(Ident::new("foo")))]);
-        assert_eq!(to_string(m.tokens()), "match foo { ref a | Foo { foo : ref a , .. } => foo , } ");
+        assert_eq!(m.tokens().to_string(), "match foo { ref a | Foo { foo : ref a , .. } => foo , } ");
     }
 
     #[test]
@@ -1036,6 +1113,19 @@ mod test {
                           Box::new(Expr::Ident(Ident::new("thing"))),
                           Box::new(Block(vec![])));
 
-        assert_eq!(to_string(f.tokens()), "for ( ref p , ref s , ) in thing { } ");
+        assert_eq!(f.tokens().to_string(), "for ( ref p , ref s , ) in thing { } ");
+    }
+
+    fn test_fnndef() {
+        //     pub fn pack<Out: Write>(&self, out: &mut Out) -> Result<usize> { ... }
+        let out = Type::Ident(from("Out"), Type::Unit);
+        let fndef = Item { vis: Vis::Public,
+                           item: Items::Fn(from("pack"),
+                                           vec![/* Out: Write */],
+                                           vec![Arg::SelfRef, Arg::Arg(Pattern::Val(from("out")), out)],
+                                           Type::Param(Type::Ident(from("Result"), vec![Type::Bound(Type::Usize)])),
+                                           Block::new(vec![])) };
+
+        panic!("fndef {:?} {}", &fndef, &fndef);
     }
 }
