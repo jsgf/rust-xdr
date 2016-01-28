@@ -19,7 +19,7 @@ pub fn parse_path(ctxt: &ExtCtxt, e: &str) -> ast::Path {
     let mut p = syntax::parse::new_parser_from_source_str(&ctxt.parse_sess, Vec::new(), String::new(), e.to_string());
     let r = p.parse_path(syntax::parse::parser::NoTypesAllowed);
     p.abort_if_errors();
-    r.unwrap_or_else(|_|panic!())
+    r.unwrap_or_else(|_| panic!("failed"))
 }
 
 pub fn parse_path_vec(s: &str) -> Vec<ast::Ident> {
@@ -30,13 +30,13 @@ pub fn parse_block(ctxt: &ExtCtxt, e: &str) -> P<ast::Block> {
     let mut p = syntax::parse::new_parser_from_source_str(&ctxt.parse_sess, Vec::new(), String::new(), e.to_string());
     let r = p.parse_block();
     p.abort_if_errors();
-    r.unwrap_or_else(|e| panic!(e))
+    r.unwrap_or_else(|_| panic!("failed"))
 }
 
 pub fn parse_type(ctxt: &ExtCtxt, e: &str) -> P<ast::Ty> {
     let mut p = syntax::parse::new_parser_from_source_str(&ctxt.parse_sess, Vec::new(), String::new(), e.to_string());
     let r = p.parse_ty();
     p.abort_if_errors();
-    r.unwrap_or_else(|e| panic!(e))
+    r.unwrap_or_else(|_| panic!("failed"))
 
 }

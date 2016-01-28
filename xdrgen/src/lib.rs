@@ -19,7 +19,6 @@ extern crate nom;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
-use std::error::Error;
 use std::fmt::Display;
 use std::env;
 use std::iter::FromIterator;
