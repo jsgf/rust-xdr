@@ -1,6 +1,6 @@
 [package]
 name = "xdr-codec"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT"
 description = "XDR encode/decode runtime support. Pairs with xdrgen which generates code from specs."
@@ -9,4 +9,4 @@ readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 
 [dependencies]
-byteorder = "0.3.11"
+byteorder = "0.4.2"
