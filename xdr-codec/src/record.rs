@@ -16,7 +16,7 @@ use std::io::{self, Read, BufRead, Write};
 use std::cmp::min;
 use byteorder;
 
-use super::{unpack, pack, Result, Error};
+use super::{unpack, pack, Error};
 
 const LAST_REC: u32 = 1u32 << 31;
 
