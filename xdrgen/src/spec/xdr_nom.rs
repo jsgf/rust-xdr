@@ -314,10 +314,10 @@ named!(directive<()>,
 fn test_comments() {
     assert_eq!(blockcomment(&b"/* foo */bar"[..]), Done(&b"bar"[..], ()));
     assert_eq!(blockcomment(&b"/* blip /* foo */bar"[..]), Done(&b"bar"[..], ()));
-    assert_eq!(blockcomment(&b"x"[..]), Error(Err::Position(ErrorKind::Complete, &b"x"[..])));
+    assert_eq!(blockcomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
     assert_eq!(linecomment(&b"// foo\nbar"[..]), Done(&b"\nbar"[..], ()));
     assert_eq!(linecomment(&b"// foo bar\n "[..]), Done(&b"\n "[..], ()));
-    assert_eq!(linecomment(&b"x"[..]), Error(Err::Position(ErrorKind::Complete, &b"x"[..])));
+    assert_eq!(linecomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
 
     assert_eq!(directive(&b"#define foo bar\n "[..]), Done(&b"\n "[..], ()));
     assert_eq!(directive(&b"%#define foo bar\n "[..]), Done(&b"\n "[..], ()));
