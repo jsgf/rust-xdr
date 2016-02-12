@@ -629,10 +629,12 @@ impl Emitpack for Typespec {
                             };
 
                             let ret = match decl {
-                                &Void => quote_tokens!(ctxt, $disc => $name::$label,),
+                                //&Void => quote_tokens!(ctxt, $disc => $name::$label,),
+                                &Void => quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label,),
                                 &Named(_, ref ty) => {
                                     let unpack = ty.unpacker(symtab, ctxt);
                                     quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
+                                    //quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
                                 },
                             };
                             Ok(ret)
@@ -659,7 +661,7 @@ impl Emitpack for Typespec {
                     &Named(_, ref ty) => ty.unpacker(symtab, ctxt),
                 };
 
-                quote_tokens!(ctxt, match { let (v, dsz) = $selunpack; sz += dsz; v } { $matches })
+                quote_tokens!(ctxt, match { let (v, dsz): (i32, _) = $selunpack; sz += dsz; v } { $matches })
             },
 
             &Flex(_, _) | &Array(_, _) | &Option(_) => ty.unpacker(symtab, ctxt),

@@ -185,3 +185,22 @@ fn enums() {
         panic!("test {} failed: {}", name, e);
     }
 }
+
+#[test]
+fn unions() {
+    let name = "unions";
+    let spec = r#"
+        enum Foo {
+            A = 0,
+            B = -1,
+        };
+        union foo switch (Foo bar) {
+        case A: int val;
+        case B: void;
+        };
+    "#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
