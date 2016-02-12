@@ -5,6 +5,7 @@ authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT"
 description = "XDR encode/decode runtime support. Pairs with xdrgen which generates code from specs."
 repository = "https://github.com/jsgf/rust-xdr-codec"
+documentation = "https://jsgf.github.io/rust-xdr/doc/xdr-codec/index.html"
 readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 
