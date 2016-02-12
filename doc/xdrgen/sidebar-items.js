@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["compile","Simplest possible way to generate Rust code from an XDR specification."],["generate","Generate Rust code from an RFC4506 XDR specification"]]});

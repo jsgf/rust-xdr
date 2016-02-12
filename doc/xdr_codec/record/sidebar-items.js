@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["XdrRecordReader","Read records from a bytestream."],["XdrRecordWriter","Write records into a bytestream."]]});
