@@ -171,4 +171,17 @@ fn rfc4506() {
     }
 }
     
+#[test]
+fn enums() {
+    let name = "enums";
+    let spec = r#"
+        enum Foo {
+            A = 0,
+            B = -1,
+        };
+    "#;
 
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
