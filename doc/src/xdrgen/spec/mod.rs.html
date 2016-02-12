@@ -835,6 +835,10 @@
 <span id="792">792</span>
 <span id="793">793</span>
 <span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
 </pre><pre class='rust '>
 <span class='attribute'>#<span class='op'>!</span>[<span class='ident'>allow</span>(<span class='ident'>unused_imports</span>, <span class='ident'>unused_mut</span>, <span class='ident'>dead_code</span>)]</span>
 
@@ -1416,13 +1420,15 @@
                 <span class='kw'>let</span> <span class='ident'>matchdefs</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>defs</span>.<span class='ident'>iter</span>()
                     .<span class='ident'>filter_map</span>(<span class='op'>|</span><span class='kw-2'>&amp;</span><span class='ident'>EnumDefn</span>(<span class='kw-2'>ref</span> <span class='ident'>name</span>, _)<span class='op'>|</span> {
                         <span class='kw'>let</span> <span class='ident'>tok</span> <span class='op'>=</span> <span class='ident'>rustast</span>::<span class='ident'>str_to_ident</span>(<span class='ident'>name</span>);
-                        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>((<span class='kw-2'>ref</span> <span class='ident'>val</span>, <span class='kw-2'>ref</span> <span class='ident'>scope</span>)) <span class='op'>=</span> <span class='ident'>symtab</span>.<span class='ident'>getconst</span>(<span class='ident'>name</span>) {
-                            <span class='kw'>let</span> <span class='ident'>val</span> <span class='op'>=</span> <span class='op'>*</span><span class='ident'>val</span> <span class='kw'>as</span> <span class='ident'>i32</span>;
+                        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>((<span class='kw-2'>ref</span> <span class='ident'>_val</span>, <span class='kw-2'>ref</span> <span class='ident'>scope</span>)) <span class='op'>=</span> <span class='ident'>symtab</span>.<span class='ident'>getconst</span>(<span class='ident'>name</span>) {
+                            <span class='comment'>//let val = *val as i32;</span>
                             <span class='kw'>if</span> <span class='kw'>let</span> <span class='kw-2'>&amp;</span><span class='prelude-val'>Some</span>(<span class='kw-2'>ref</span> <span class='ident'>scope</span>) <span class='op'>=</span> <span class='ident'>scope</span> {
                                 <span class='kw'>let</span> <span class='ident'>scope</span> <span class='op'>=</span> <span class='ident'>rustast</span>::<span class='ident'>str_to_ident</span>(<span class='ident'>scope</span>);
-                                <span class='prelude-val'>Some</span>(<span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>val</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>scope</span> :: <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span>,))
+                                <span class='comment'>//Some(quote_tokens!(ctxt, $val =&gt; $scope :: $tok,))</span>
+                                <span class='prelude-val'>Some</span>(<span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='ident'>x</span> <span class='kw'>if</span> <span class='ident'>x</span> <span class='op'>==</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>scope</span> :: <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span> <span class='kw'>as</span> <span class='ident'>i32</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>scope</span> :: <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span>,))
                             } <span class='kw'>else</span> {
-                                <span class='prelude-val'>Some</span>(<span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>val</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span>,))
+                                <span class='comment'>//Some(quote_tokens!(ctxt, $val =&gt; $tok,))</span>
+                                <span class='prelude-val'>Some</span>(<span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='ident'>x</span> <span class='kw'>if</span> <span class='ident'>x</span> <span class='op'>==</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span> <span class='kw'>as</span> <span class='ident'>i32</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>tok</span>,))
                             }
                         } <span class='kw'>else</span> {
                             <span class='macro'>println</span><span class='macro'>!</span>(<span class='string'>&quot;unknown ident {}&quot;</span>, <span class='ident'>name</span>);
@@ -1432,7 +1438,7 @@
                     .<span class='ident'>collect</span>();
 
                 <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, {
-                    <span class='kw'>let</span> (<span class='ident'>e</span>, <span class='ident'>esz</span>) <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>xdr_codec</span>::<span class='ident'>Unpack</span>::<span class='ident'>unpack</span>(<span class='ident'>input</span>));
+                    <span class='kw'>let</span> (<span class='ident'>e</span>, <span class='ident'>esz</span>): (<span class='ident'>i32</span>, _) <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>xdr_codec</span>::<span class='ident'>Unpack</span>::<span class='ident'>unpack</span>(<span class='ident'>input</span>));
                     <span class='ident'>sz</span> <span class='op'>+=</span> <span class='ident'>esz</span>;
                     <span class='kw'>match</span> <span class='ident'>e</span> {
                         <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>matchdefs</span>
@@ -1465,10 +1471,12 @@
                             };
 
                             <span class='kw'>let</span> <span class='ident'>ret</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>decl</span> {
-                                <span class='kw-2'>&amp;</span><span class='ident'>Void</span> <span class='op'>=&gt;</span> <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>disc</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>name</span>::<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>label</span>,),
+                                <span class='comment'>//&amp;Void =&gt; quote_tokens!(ctxt, $disc =&gt; $name::$label,),</span>
+                                <span class='kw-2'>&amp;</span><span class='ident'>Void</span> <span class='op'>=&gt;</span> <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='ident'>x</span> <span class='kw'>if</span> <span class='ident'>x</span> <span class='op'>==</span> (<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>disc</span> <span class='kw'>as</span> <span class='ident'>i32</span>) <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>name</span>::<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>label</span>,),
                                 <span class='kw-2'>&amp;</span><span class='ident'>Named</span>(_, <span class='kw-2'>ref</span> <span class='ident'>ty</span>) <span class='op'>=&gt;</span> {
                                     <span class='kw'>let</span> <span class='ident'>unpack</span> <span class='op'>=</span> <span class='ident'>ty</span>.<span class='ident'>unpacker</span>(<span class='ident'>symtab</span>, <span class='ident'>ctxt</span>);
                                     <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>disc</span> <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>name</span>::<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>label</span>({ <span class='kw'>let</span> (<span class='ident'>v</span>, <span class='ident'>fsz</span>) <span class='op'>=</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>unpack</span>; <span class='ident'>sz</span> <span class='op'>+=</span> <span class='ident'>fsz</span>; <span class='ident'>v</span> }),)
+                                    <span class='comment'>//quote_tokens!(ctxt, x if x == ($disc as i32) =&gt; $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)</span>
                                 },
                             };
                             <span class='prelude-val'>Ok</span>(<span class='ident'>ret</span>)
@@ -1495,7 +1503,7 @@
                     <span class='kw-2'>&amp;</span><span class='ident'>Named</span>(_, <span class='kw-2'>ref</span> <span class='ident'>ty</span>) <span class='op'>=&gt;</span> <span class='ident'>ty</span>.<span class='ident'>unpacker</span>(<span class='ident'>symtab</span>, <span class='ident'>ctxt</span>),
                 };
 
-                <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='kw'>match</span> { <span class='kw'>let</span> (<span class='ident'>v</span>, <span class='ident'>dsz</span>) <span class='op'>=</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>selunpack</span>; <span class='ident'>sz</span> <span class='op'>+=</span> <span class='ident'>dsz</span>; <span class='ident'>v</span> } { <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>matches</span> })
+                <span class='macro'>quote_tokens</span><span class='macro'>!</span>(<span class='ident'>ctxt</span>, <span class='kw'>match</span> { <span class='kw'>let</span> (<span class='ident'>v</span>, <span class='ident'>dsz</span>): (<span class='ident'>i32</span>, _) <span class='op'>=</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>selunpack</span>; <span class='ident'>sz</span> <span class='op'>+=</span> <span class='ident'>dsz</span>; <span class='ident'>v</span> } { <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>matches</span> })
             },
 
             <span class='kw-2'>&amp;</span><span class='ident'>Flex</span>(_, _) <span class='op'>|</span> <span class='kw-2'>&amp;</span><span class='ident'>Array</span>(_, _) <span class='op'>|</span> <span class='kw-2'>&amp;</span><span class='prelude-ty'>Option</span>(_) <span class='op'>=&gt;</span> <span class='ident'>ty</span>.<span class='ident'>unpacker</span>(<span class='ident'>symtab</span>, <span class='ident'>ctxt</span>),
