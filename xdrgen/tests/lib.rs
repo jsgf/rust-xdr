@@ -179,6 +179,7 @@ fn enums() {
             A = 0,
             B = -1,
         };
+        struct Bar { Foo x; };
     "#;
 
     if let Err(e) = build_test(name, spec) {
@@ -197,7 +198,26 @@ fn unions() {
         union foo switch (Foo bar) {
         case A: int val;
         case B: void;
+        default: int other;
         };
+        union foo2 switch (Foo bar) {
+        case A: void;
+        case B: int a;
+        default: int other;
+        };
+    "#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
+
+#[test]
+fn consts() {
+    let name = "consts";
+    let spec = r#"
+        const FOO = 1;
+        const BAR = -1;
     "#;
 
     if let Err(e) = build_test(name, spec) {

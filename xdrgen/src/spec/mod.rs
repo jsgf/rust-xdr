@@ -633,8 +633,8 @@ impl Emitpack for Typespec {
                                 &Void => quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label,),
                                 &Named(_, ref ty) => {
                                     let unpack = ty.unpacker(symtab, ctxt);
-                                    quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
-                                    //quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
+                                    //quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
+                                    quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
                                 },
                             };
                             Ok(ret)
