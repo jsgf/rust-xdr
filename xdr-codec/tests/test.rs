@@ -1,7 +1,7 @@
 extern crate xdr_codec;
 
 use std::io::Cursor;
-use xdr_codec::*;
+use xdr_codec::{Pack, Unpack, pack_array, unpack_string, unpack_flex_array, Error};
 
 #[test]
 fn basic_8() {
@@ -251,6 +251,48 @@ fn basic_opaque_flex() {
         let mut input = Cursor::new(v);
         assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44, 0x55], 12));
     }
+}
+
+#[test]
+fn bounded_flex() {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u8, 0x22, 0x33, 0x44, 0x55].pack(&mut out).unwrap(), 12);
+
+        let v = out.into_inner();
+
+        {
+            let mut input = Cursor::new(v.clone());
+            assert_eq!(unpack_flex_array(&mut input, 10).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44, 0x55], 12));
+        }
+        {
+            let mut input = Cursor::new(v.clone());
+            match unpack_flex_array::<_, u8>(&mut input, 4) {
+                Result::Err(Error::InvalidLen) => (),
+                e => panic!("Unexpected {:?}", e),
+            }
+        }
+}
+
+#[test]
+fn bounded_string() {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(String::from("hello, world").pack(&mut out).unwrap(), 16);
+
+        let v = out.into_inner();
+
+        {
+            let mut input = Cursor::new(v.clone());
+            assert_eq!(unpack_string(&mut input, 16).unwrap(), (String::from("hello, world"), 16));
+        }
+        {
+            let mut input = Cursor::new(v.clone());
+            match unpack_string(&mut input, 5) {
+                Result::Err(Error::InvalidLen) => (),
+                e => panic!("Unexpected {:?}", e),
+            }
+        }
 }
 
 #[test]
