@@ -489,6 +489,3 @@ impl<'a, In: Read, T> Unpack<In> for Cow<'a, T>
         Ok((Cow::Owned(b), sz))
     }
 }
-
-#[cfg(test)]
-mod test;

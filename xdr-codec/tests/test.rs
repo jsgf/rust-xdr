@@ -1,5 +1,7 @@
-use super::*;
+extern crate xdr_codec;
+
 use std::io::Cursor;
+use xdr_codec::*;
 
 #[test]
 fn basic_8() {
@@ -192,6 +194,34 @@ fn basic_opaque_flex() {
 
         let mut input = Cursor::new(v);
         assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44], 8));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u8, 0x22].pack(&mut out).unwrap(), 8);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 8);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x02, 0x11, 0x22, 0x00, 0x00]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22], 8));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u8, 0x22, 0x00].pack(&mut out).unwrap(), 8);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 8);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x03, 0x11, 0x22, 0x00, 0x00]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x00], 8));
     }
 
     {
