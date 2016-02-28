@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["XdrRecordReader","Read records from a bytestream."],["XdrRecordWriter","Write records into a bytestream."]]});
+initSidebarItems({"struct":[["XdrRecordReader","Read records from a bytestream.Reads will read up to the end of the current fragment, and not beyond. The `BufRead` trait doesn't otherwise allow for record boundaries to be deliniated. Callers can use the `eor` method to determine record ends."],["XdrRecordWriter","Write records into a bytestream.Flushes the current buffer as end of record when destroyed."]]});

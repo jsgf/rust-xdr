@@ -46,7 +46,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-0' class='srclink' href='../src/xdr_codec/lib.rs.html#1-494' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/xdr_codec/src/lib.rs.html#1-505' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>XDR runtime encoding/decoding</p>
 
 <p>This crate provides runtime support for encoding and decoding XDR
@@ -63,7 +63,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::record'>record</a></td>
                         <td class='docblock short'>
                              <p>XDR record marking</p>
-
                         </td>
                     </tr>
                 </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
@@ -73,7 +72,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Error'>Error</a></td>
                         <td class='docblock short'>
                              <p>XDR errors</p>
-
                         </td>
                     </tr>
                 </table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
@@ -83,7 +81,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Pack'>Pack</a></td>
                         <td class='docblock short'>
                              <p>Basic packing trait.</p>
-
                         </td>
                     </tr>
                 
@@ -92,7 +89,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Read'>Read</a></td>
                         <td class='docblock short'>
                              <p>The <code>Read</code> trait allows for reading bytes from a source.</p>
-
                         </td>
                     </tr>
                 
@@ -101,7 +97,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Unpack'>Unpack</a></td>
                         <td class='docblock short'>
                              <p>Basic unpacking trait</p>
-
                         </td>
                     </tr>
                 
@@ -110,7 +105,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Write'>Write</a></td>
                         <td class='docblock short'>
                              <p>A trait for objects which are byte-oriented sinks.</p>
-
                         </td>
                     </tr>
                 </table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
@@ -120,7 +114,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::pack'>pack</a></td>
                         <td class='docblock short'>
                              <p>Serialization (packing) helper.</p>
-
                         </td>
                     </tr>
                 
@@ -129,7 +122,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::pack_array'>pack_array</a></td>
                         <td class='docblock short'>
                              <p>Pack a fixed-size array.</p>
-
                         </td>
                     </tr>
                 
@@ -138,7 +130,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::unpack'>unpack</a></td>
                         <td class='docblock short'>
                              <p>Deserialization (unpacking) helper function</p>
-
                         </td>
                     </tr>
                 
@@ -147,7 +138,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::unpack_flex_array'>unpack_flex_array</a></td>
                         <td class='docblock short'>
                              <p>Unpack a length-limited array</p>
-
                         </td>
                     </tr>
                 
@@ -156,7 +146,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::unpack_string'>unpack_string</a></td>
                         <td class='docblock short'>
                              <p>Unpack length-limited string</p>
-
                         </td>
                     </tr>
                 </table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
@@ -166,7 +155,6 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::Result'>Result</a></td>
                         <td class='docblock short'>
                              <p>A wrapper around <code>std::result::Result</code> where errors are all <code>xdr_codec::Error</code>.</p>
-
                         </td>
                     </tr>
                 </table></section>
@@ -212,7 +200,7 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
 
                 <p>
                     Search functions by type signature (e.g.
-                    <code>vec -> usize</code>)
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
                 </p>
             </div>
         </div>
