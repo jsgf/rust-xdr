@@ -33,6 +33,7 @@ fn mapioerr(xdrerr: Error) -> io::Error {
 /// beyond. The `BufRead` trait doesn't otherwise allow for record
 /// boundaries to be deliniated. Callers can use the `eor` method to
 /// determine record ends.
+#[derive(Debug)]
 pub struct XdrRecordReader<R: BufRead> {
     size: usize,                // record size
     consumed: usize,            // bytes consumed
@@ -53,6 +54,7 @@ impl<R: BufRead> XdrRecordReader<R> {
         }
     }
 
+    // read next record, returns true on EOF
     fn nextrec(&mut self) -> io::Result<bool> {
         assert_eq!(self.consumed, self.size);
 
@@ -109,6 +111,63 @@ impl<R: BufRead> BufRead for XdrRecordReader<R> {
         assert!(sz <= self.totremains());
         self.consumed += sz;
         self.reader.consume(sz);
+    }
+}
+
+impl<R: BufRead> IntoIterator for XdrRecordReader<R> {
+    type Item = io::Result<Vec<u8>>;
+    type IntoIter = XdrRecordReaderIter<R>;
+
+    fn into_iter(self) -> Self::IntoIter { XdrRecordReaderIter(Some(self)) }
+}
+
+/// Iterator over records in the stream.
+///
+/// Each iterator result is either:
+///
+///  * A complete record, or
+///  * an IO error.
+///
+/// It will return an IO error once, and then end the iterator.
+/// A short read or an unterminated record will also end the iterator. It will not return a partial
+/// record.
+#[derive(Debug)]
+pub struct XdrRecordReaderIter<R: BufRead>(Option<XdrRecordReader<R>>);
+
+impl<R: BufRead> Iterator for XdrRecordReaderIter<R> {
+    type Item = io::Result<Vec<u8>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(mut rr) = self.0.take() {
+            let mut buf = Vec::new();
+
+            // loop over fragments until we get a complete record
+            loop {
+                // Do we need next fragment?
+                if rr.totremains() == 0 {
+                    match rr.nextrec() {
+                        Err(e) => return Some(Err(e)),  // IO error
+                        Ok(true) => return None,        // EOF
+                        Ok(false) => (),                // keep going
+                    }
+                }
+
+                let remains = rr.totremains();
+                let eor = rr.eor();
+
+                match rr.by_ref().take(remains as u64).read_to_end(&mut buf) {
+                    Ok(sz) if sz == remains => (),  // OK, keep going
+                    Ok(_) => return None,           // short read
+                    Err(e) => return Some(Err(e)),  // error
+                };
+
+                if eor { break }
+            }
+            self.0 = Some(rr);
+            Some(Ok(buf))
+        } else {
+            None
+        }
     }
 }
 

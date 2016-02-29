@@ -52,6 +52,20 @@ fn recread_half() {
 }
 
 #[test]
+fn recread_iter() {
+    let inbuf = vec![  0, 0, 0, 5,  0, 1, 2, 3, 4,
+                       128, 0, 0, 5,  5, 6, 7, 8, 9,
+                       128, 0, 0, 1,  99];
+    let cur = Cursor::new(inbuf);
+    let recread = XdrRecordReader::new(cur);
+
+    let expected = vec![ vec![ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 ], vec![ 99 ] ];
+    let got: Vec<_> = recread.into_iter().map(|r| r.expect("IO error")).collect();
+
+    assert_eq!(expected, got);
+}
+
+#[test]
 fn read_zerorec() {
     let inbuf = vec![0, 0, 0, 0,
                      0, 0, 0, 0,
