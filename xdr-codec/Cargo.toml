@@ -11,3 +11,6 @@ keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 
 [dependencies]
 byteorder = "0.4.2"
+
+[dev-dependencies]
+quickcheck = "0.2"

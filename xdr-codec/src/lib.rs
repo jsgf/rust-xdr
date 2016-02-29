@@ -216,6 +216,13 @@ impl<Out: Write> Pack<Out> for u8 {
     }
 }
 
+impl<Out: Write> Pack<Out> for i8 {
+    #[inline]
+    fn pack(&self, out: &mut Out) -> Result<usize> {
+        out.write_i8(*self).map_err(Error::from).map(|_| 1)
+    }
+}
+
 impl<Out: Write> Pack<Out> for u32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
@@ -364,6 +371,13 @@ impl<In: Read> Unpack<In> for u8 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
         input.read_u8().map_err(Error::from).map(|v| (v, 1))
+    }
+}
+
+impl<In: Read> Unpack<In> for i8 {
+    #[inline]
+    fn unpack(input: &mut In) -> Result<(Self, usize)> {
+        input.read_i8().map_err(Error::from).map(|v| (v, 1))
     }
 }
 
