@@ -136,10 +136,15 @@ impl fmt::Display for Error {
     }
 }
 
-// return padding needed
+static PADDING: [u8; 4] = [0; 4];
+
+/// Compute XDR padding.
+///
+/// Return slice of zero padding needed to bring `sz` up to a multiple of 4. If no padding is needed,
+/// it will be a zero-sized slice.
 #[inline]
-fn padding(sz: usize) -> usize {
-    (4 - (sz % 4)) % 4
+pub fn padding(sz: usize) -> &'static [u8] {
+    &PADDING[..(4 - (sz % 4)) % 4]
 }
 
 /// Serialization (packing) helper.
@@ -158,12 +163,12 @@ pub fn pack_array<Out: Write, T: Pack<Out>>(val: &[T], out: &mut Out) -> Result<
         vsz += try!(v.pack(out))
     }
 
-    let mut psz = 0;
-    for _ in 0..padding(vsz) {
-        psz += try!(0u8.pack(out));
+    let p = padding(vsz);
+    if p.len() > 0 {
+        try!(out.write_all(p))
     }
 
-    Ok(vsz + psz)
+    Ok(vsz + p.len())
 }
 
 /// Unpack a length-limited array
@@ -181,7 +186,8 @@ pub fn unpack_flex_array<In: Read, T: Unpack<In>>(input: &mut In, maxsz: usize) 
         out.push(e);
         sz += esz;
     }
-    for _ in 0..padding(sz) {
+
+    for _ in 0..padding(sz).len() {
         let (_, psz): (u8, _) = try!(Unpack::unpack(input));
         sz += psz;
     }
@@ -295,9 +301,13 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for [T] {
         for it in self {
             sz += try!(it.pack(out))
         }
-        for _ in 0..padding(sz) {
-            sz += try!(0u8.pack(out));
+
+        let p = padding(sz);
+        if p.len() > 0 {
+            try!(out.write_all(p));
+            sz += p.len();
         }
+
         Ok(sz)
     }
 }
@@ -458,7 +468,7 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Vec<T> {
             out.push(e);
             sz += esz;
         }
-        for _ in 0..padding(sz) {
+        for _ in 0..padding(sz).len() {
             let (_, psz): (u8, _) = try!(Unpack::unpack(input));
             sz += psz;
         }
