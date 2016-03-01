@@ -1,8 +1,8 @@
 //! XDR record marking
 //!
 //! This module implements wrappers for `Write` and `BufRead` which
-//! implement "Record Marking" from RFC1831, used for encoding XDR
-//! structures onto a bytestream such as TCP.
+//! implement "Record Marking" from [RFC1831](https://tools.ietf.org/html/rfc1831.html#section-10),
+//! used for encoding XDR structures onto a bytestream such as TCP.
 //!
 //! The format is simple - each record is broken up into one or more
 //! record fragments. Each record fragment is prefixed with a 32-bit
