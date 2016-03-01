@@ -177,9 +177,10 @@ const WRBUF: usize = 65536;
 ///
 /// Flushes the current buffer as end of record when destroyed.
 pub struct XdrRecordWriter<W: Write> {
-    buf: Vec<u8>,
-    bufsz: usize,
-    writer: W,
+    buf: Vec<u8>,   // accumulated record fragment
+    bufsz: usize,   // max fragment size
+    eor: bool,      // last fragment was eor
+    writer: W,      // writer we're passing on to
 }
 
 impl<W: Write> XdrRecordWriter<W> {
@@ -196,6 +197,7 @@ impl<W: Write> XdrRecordWriter<W> {
         XdrRecordWriter {
             buf: Vec::with_capacity(bufsz),
             bufsz: bufsz,
+            eor: false,
             writer: w
         }
     }
@@ -205,20 +207,22 @@ impl<W: Write> XdrRecordWriter<W> {
     pub fn flush_eor(&mut self, eor: bool) -> io::Result<()> {
         if !eor && self.buf.len() == 0 { return Ok(()) }
 
-        let mut rechdr = self.buf.len() as u32;
-        if eor { rechdr |= LAST_REC };
+        let rechdr = self.buf.len() as u32 | (if eor { LAST_REC } else { 0 });
 
         try!(pack(&rechdr, &mut self.writer).map_err(mapioerr));
         let _ = try!(self.writer.write_all(&self.buf).map(|_| ()));
         self.buf.truncate(0);
 
+        self.eor = eor;
         self.writer.flush()
     }
 }
 
 impl<W: Write> Drop for XdrRecordWriter<W> {
     fn drop(&mut self) {
-        let _ = self.flush_eor(true);
+        if self.buf.len() > 0 || !self.eor {
+            let _ = self.flush_eor(true);
+        }
     }
 }
 
