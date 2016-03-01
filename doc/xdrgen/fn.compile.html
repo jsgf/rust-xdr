@@ -50,6 +50,7 @@
 <pre class='rust fn'>pub fn compile&lt;P&gt;(infile: P) -&gt; Result&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt; <span class='where'>where P: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.AsRef.html' title='core::convert::AsRef'>AsRef</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/path/struct.Path.html' title='std::path::Path'>Path</a>&gt; + <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html' title='core::fmt::Display'>Display</a></span></pre><div class='docblock'><p>Simplest possible way to generate Rust code from an XDR specification.</p>
 
 <p>It is intended for use in a build.rs script:</p>
+
 <pre class='rust rust-example-rendered'>
 <span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>xdrgen</span>;
 
@@ -58,6 +59,7 @@
 }</pre>
 
 <p>Output is put into OUT_DIR, and can be included:</p>
+
 <pre class='rust rust-example-rendered'>
 <span class='kw'>mod</span> <span class='ident'>simple</span> {
    <span class='kw'>use</span> <span class='ident'>xdr_codec</span>;
