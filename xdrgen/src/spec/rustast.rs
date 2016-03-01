@@ -1,4 +1,4 @@
-pub use syntax;
+    use syntax;
 pub use syntax::ast;
 pub use syntax::ptr::P;
 pub use syntax::codemap::DUMMY_SP;
