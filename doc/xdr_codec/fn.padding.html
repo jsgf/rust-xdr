@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `pack` fn in crate `xdr_codec`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, pack">
+    <meta name="description" content="API documentation for the Rust `padding` fn in crate `xdr_codec`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, padding">
 
-    <title>xdr_codec::pack - Rust</title>
+    <title>xdr_codec::padding - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../rustdoc.css">
     <link rel="stylesheet" type="text/css" href="../main.css">
@@ -27,7 +27,7 @@
 
     <nav class="sidebar">
         
-        <p class='location'><a href='index.html'>xdr_codec</a></p><script>window.sidebarCurrent = {name: 'pack', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='index.html'>xdr_codec</a></p><script>window.sidebarCurrent = {name: 'padding', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </nav>
 
     <nav class="sub">
@@ -42,14 +42,15 @@
     </nav>
 
     <section id='main' class="content fn">
-<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>xdr_codec</a>::<wbr><a class='fn' href=''>pack</a></span><span class='out-of-band'><span id='render-detail'>
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>xdr_codec</a>::<wbr><a class='fn' href=''>padding</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-238' class='srclink' href='../src/xdr_codec/src/lib.rs.html#153-155' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn pack&lt;Out: <a class='trait' href='../xdr_codec/trait.Write.html' title='xdr_codec::Write'>Write</a>, T: <a class='trait' href='../xdr_codec/trait.Pack.html' title='xdr_codec::Pack'>Pack</a>&lt;Out&gt;&gt;(val: &amp;T, out: &amp;mut Out) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</pre><div class='docblock'><p>Serialization (packing) helper.</p>
+        </span><a id='src-236' class='srclink' href='../src/xdr_codec/src/lib.rs.html#146-148' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn padding(sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;'static [</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a></pre><div class='docblock'><p>XDR padding</p>
 
-<p>Helper to serialize any type implementing <code>Pack</code> into an implementation of <code>std::io::Write</code>.</p>
+<p>Return slice of zero padding needed to bring sz up to a multiple of 4. If no padding is needed,
+it will be a zero-sized slice.</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 
