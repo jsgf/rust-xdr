@@ -46,10 +46,14 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-388' class='srclink' href='../src/xdr_codec/src/lib.rs.html#253-265' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn unpack_array&lt;In: <a class='trait' href='../xdr_codec/trait.Read.html' title='xdr_codec::Read'>Read</a>, T: <a class='trait' href='../xdr_codec/trait.Unpack.html' title='xdr_codec::Unpack'>Unpack</a>&lt;In&gt;&gt;(input: &amp;mut In, sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(</a><a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;T&gt;, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>)</a>&gt;</pre><div class='docblock'><p>Unpack a fixed-sized array</p>
+        </span><a id='src-388' class='srclink' href='../src/xdr_codec/src/lib.rs.html#257-284' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn unpack_array&lt;In: <a class='trait' href='../xdr_codec/trait.Read.html' title='xdr_codec::Read'>Read</a>, T: <a class='trait' href='../xdr_codec/trait.Unpack.html' title='xdr_codec::Unpack'>Unpack</a>&lt;In&gt; + <a class='trait' href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a>&gt;(input: &amp;mut In, array: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;mut [</a>T<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, arraysz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;</pre><div class='docblock'><p>Unpack a fixed-sized array</p>
 
-<p>Unpack a fixed-size array of elements.</p>
+<p>Unpack a fixed-size array of elements. The results are placed in <code>array</code>, but the actual wire-size of
+the array is <code>arraysz</code>. If the supplied <code>array</code> is too large, the remainer is filled in with the type&#39;s
+default value; if it is too small, the excess elements are discarded.</p>
+
+<p>All the elements in <code>array</code> will be initialized after a successful return.</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 
