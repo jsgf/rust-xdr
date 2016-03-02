@@ -249,32 +249,73 @@ pub fn pack_string<Out: Write>(val: &str, maxsz: Option<usize>, out: &mut Out) -
 
 /// Unpack a fixed-sized array
 ///
-/// Unpack a fixed-size array of elements.
-pub fn unpack_array<In: Read, T: Unpack<In>>(input: &mut In, sz: usize) -> Result<(Vec<T>, usize)> {
-    let mut ret = Vec::with_capacity(sz);
+/// Unpack a fixed-size array of elements. The results are placed in `array`, but the actual wire-size of
+/// the array is `arraysz`. If the supplied `array` is too large, the remainer is filled in with the type's
+/// default value; if it is too small, the excess elements are discarded.
+///
+/// All the elements in `array` will be initialized after a successful return.
+pub fn unpack_array<In: Read, T: Unpack<In> + Default>(input: &mut In, array: &mut [T], arraysz: usize) -> Result<usize> {
     let mut rsz = 0;
+    let sz = min(arraysz, array.len());
 
-    for _ in 0..sz {
+    for elem in &mut array[..sz] {
         let (v, sz) = try!(Unpack::unpack(input));
         rsz += sz;
-        ret.push(v);
+        *elem = v;
+    }
+
+    // Fill in excess array entries with default values
+    if arraysz < array.len() {
+        for elem in &mut array[arraysz..] {
+            *elem = T::default();
+        }
+    }
+
+    // Mop up unused array entries on the wire
+    if arraysz > array.len() {
+        for _ in array.len()..arraysz {
+            let (_, sz) = try!(T::unpack(input));
+            rsz += sz;
+        }
     }
     assert!(rsz % 4 == 0);
 
-    Ok((ret, rsz))
+    Ok(rsz)
 }
 
 /// Unpack a fixed-sized opaque array
-pub fn unpack_opaque_array<In: Read>(input: &mut In, sz: usize) -> Result<(Vec<u8>, usize)> {
-    let mut ret = Vec::with_capacity(sz);
-    let mut rsz = try!(input.take(sz as u64).read_to_end(&mut ret));
+///
+/// Unpack a fixed-size array of raw bytes. The results are placed in `bytes`, but the actual wire-size of
+/// the array is `bytesz`. If the supplied `bytes` is too large, the remainer is filled in with 0x00;
+/// if it is too small, the excess elements are discarded.
+///
+/// All the bytes in `bytes` will be initialized after a successful call.
+pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: usize) -> Result<usize> {
+    let sz = min(bytesz, bytes.len());
+    let mut rsz = 0;
 
-    for _ in 0..padding(rsz).len() {
-        let _ = try!(input.read_u8());
-        rsz += 1;
+    while rsz < sz {
+        let r = try!(input.read(&mut bytes[rsz..]));
+        rsz += r;
     }
 
-    Ok((ret, rsz))
+    // Fill in excess
+    if sz < bytes.len() {
+        for b in &mut bytes[sz..] {
+            *b = 0;
+        }
+    }
+
+    // Mop up unused data on the wire and padding
+    let p = padding(bytesz).len();
+    if bytes.len() < bytesz + p {
+        for _ in bytes.len()..(bytesz + p) {
+            let _ = try!(input.read_u8());
+            rsz += 1;
+        }
+    }
+
+    Ok(rsz)
 }
 
 /// Unpack a (perhaps) length-limited array
