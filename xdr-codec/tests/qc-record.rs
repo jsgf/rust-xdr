@@ -9,24 +9,24 @@ use quickcheck::{quickcheck, TestResult};
 
 // Make sure XdrRecordWriter writes the right stuff
 fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {
-    const EOR: u32 = 1u32 << 31;
+    const EOR: u32 = 1 << 31;
 
-    if bufsz == 0 || bytes.len() == 0 { return TestResult::discard() }
+    if bufsz == 0 { return TestResult::discard() }
 
     // Make an expected serialization into fragments
     let mut expected = Vec::new();
-    let lastchunk = ((bytes.len() + bufsz - 1) / bufsz) - 1;
+    let nchunks = (bytes.len() + bufsz - 1) / bufsz;
 
     for (idx, c) in bytes.chunks(bufsz).enumerate() {
         let mut len = c.len() as u32;
-        if lastchunk == idx && eor { len |= EOR; }
+        if nchunks-1 == idx && eor { len |= EOR; }
 
         if let Err(e) = len.pack(&mut expected) {
             return TestResult::error(format!("pack failed: {:?}", e));
         }
         expected.extend(c);
     }
-    if !eor {
+    if !eor || nchunks == 0 {
         if let Err(e) = EOR.pack(&mut expected) {
             return TestResult::error(format!("eor pack failed: {:?}", e));
         }
