@@ -628,15 +628,13 @@ impl Emitpack for Typespec {
                 let matchdefs: Vec<_> = defs.iter()
                     .filter_map(|&EnumDefn(ref name, _)| {
                         let tok = rustast::str_to_ident(name);
-                        if let Some((ref _val, ref scope)) = symtab.getconst(name) {
-                            //let val = *val as i32;
+                        if let Some((ref val, ref scope)) = symtab.getconst(name) {
+                            let val = *val as i32;
                             if let &Some(ref scope) = scope {
                                 let scope = rustast::str_to_ident(scope);
-                                //Some(quote_tokens!(ctxt, $val => $scope :: $tok,))
-                                Some(quote_tokens!(ctxt, x if x == $scope :: $tok as i32 => $scope :: $tok,))
+                                Some(quote_tokens!(ctxt, $val => $scope :: $tok,))
                             } else {
-                                //Some(quote_tokens!(ctxt, $val => $tok,))
-                                Some(quote_tokens!(ctxt, x if x == $tok as i32 => $tok,))
+                                Some(quote_tokens!(ctxt, $val => $tok,))
                             }
                         } else {
                             println!("unknown ident {}", name);
@@ -679,12 +677,10 @@ impl Emitpack for Typespec {
                             };
 
                             let ret = match decl {
-                                //&Void => quote_tokens!(ctxt, $disc => $name::$label,),
-                                &Void => quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label,),
+                                &Void => quote_tokens!(ctxt, $disc => $name::$label,),
                                 &Named(_, ref ty) => {
                                     let unpack = ty.unpacker(symtab, ctxt);
-                                    //quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
-                                    quote_tokens!(ctxt, x if x == ($disc as i32) => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
+                                    quote_tokens!(ctxt, $disc => $name::$label({ let (v, fsz) = $unpack; sz += fsz; v }),)
                                 },
                             };
                             Ok(ret)
