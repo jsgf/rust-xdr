@@ -46,7 +46,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-368' class='srclink' href='../src/xdr_codec/src/lib.rs.html#224-230' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-370' class='srclink' href='../src/xdr_codec/src/lib.rs.html#233-239' title='goto source code'>[src]</a></span></h1>
 <pre class='rust fn'>pub fn pack_flex&lt;Out: <a class='trait' href='../xdr_codec/trait.Write.html' title='xdr_codec::Write'>Write</a>, T: <a class='trait' href='../xdr_codec/trait.Pack.html' title='xdr_codec::Pack'>Pack</a>&lt;Out&gt;&gt;(val: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a>T<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, maxsz: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;, out: &amp;mut Out) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;</pre><div class='docblock'><p>Pack a dynamically sized array, with size limit check.</p>
 
 <p>This packs an array of packable objects, and also applies an optional size limit.</p>

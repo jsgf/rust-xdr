@@ -731,6 +731,22 @@
 <span id="688">688</span>
 <span id="689">689</span>
 <span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
 </pre><pre class='rust '>
 <span class='doccomment'>//! XDR runtime encoding/decoding</span>
 <span class='doccomment'>//!</span>
@@ -914,8 +930,12 @@
 <span class='doccomment'>/// Pack a fixed-size array.</span>
 <span class='doccomment'>///</span>
 <span class='doccomment'>/// As the size is fixed, it doesn&#39;t need to be encoded. `sz` is in units of array elements.</span>
-<span class='doccomment'>/// If the `val` is too large, it is truncated; it is too small, then the array is padded out with default values.</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pack_array</span><span class='op'>&lt;</span><span class='ident'>Out</span>: <span class='ident'>Write</span>, <span class='ident'>T</span>: <span class='ident'>Pack</span><span class='op'>&lt;</span><span class='ident'>Out</span><span class='op'>&gt;</span> <span class='op'>+</span> <span class='ident'>Default</span><span class='op'>&gt;</span>(<span class='ident'>val</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>T</span>], <span class='ident'>sz</span>: <span class='ident'>usize</span>, <span class='ident'>out</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>Out</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
+<span class='doccomment'>/// If the `val` is too large, it is truncated; it is too small, then the array is padded out with</span>
+<span class='doccomment'>/// default values (if provided). If the array is too small and there&#39;s no pad/default value, then it fails</span>
+<span class='doccomment'>/// with `Error::InvalidLen`.</span>
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>pack_array</span><span class='op'>&lt;</span><span class='ident'>Out</span>, <span class='ident'>T</span><span class='op'>&gt;</span>(<span class='ident'>val</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>T</span>], <span class='ident'>sz</span>: <span class='ident'>usize</span>, <span class='ident'>out</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>Out</span>, <span class='ident'>defl</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>T</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span>
+    <span class='kw'>where</span> <span class='ident'>Out</span>: <span class='ident'>Write</span>, <span class='ident'>T</span>: <span class='ident'>Pack</span><span class='op'>&lt;</span><span class='ident'>Out</span><span class='op'>&gt;</span>
+{
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>vsz</span> <span class='op'>=</span> <span class='number'>0</span>;
     <span class='kw'>let</span> <span class='ident'>val</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='ident'>val</span>[..<span class='ident'>min</span>(<span class='ident'>sz</span>, <span class='ident'>val</span>.<span class='ident'>len</span>())];
 
@@ -924,10 +944,15 @@
     }
     <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>vsz</span> <span class='op'>%</span> <span class='number'>4</span> <span class='op'>==</span> <span class='number'>0</span>);
 
-    <span class='kw'>for</span> _ <span class='kw'>in</span> <span class='ident'>val</span>.<span class='ident'>len</span>()..<span class='ident'>sz</span> {
-        <span class='ident'>vsz</span> <span class='op'>+=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>T</span>::<span class='ident'>default</span>().<span class='ident'>pack</span>(<span class='ident'>out</span>))
+    <span class='kw'>if</span> <span class='ident'>val</span>.<span class='ident'>len</span>() <span class='op'>&lt;</span> <span class='ident'>sz</span> {
+        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>(<span class='ident'>defl</span>) <span class='op'>=</span> <span class='ident'>defl</span> {
+            <span class='kw'>for</span> _ <span class='kw'>in</span> <span class='ident'>val</span>.<span class='ident'>len</span>()..<span class='ident'>sz</span> {
+                <span class='ident'>vsz</span> <span class='op'>+=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>defl</span>.<span class='ident'>pack</span>(<span class='ident'>out</span>))
+            }
+        } <span class='kw'>else</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>InvalidLen</span>)
+        }
     }
-
     <span class='prelude-val'>Ok</span>(<span class='ident'>vsz</span>)
 }
 
@@ -984,11 +1009,14 @@
 <span class='doccomment'>/// Unpack a fixed-sized array</span>
 <span class='doccomment'>///</span>
 <span class='doccomment'>/// Unpack a fixed-size array of elements. The results are placed in `array`, but the actual wire-size of</span>
-<span class='doccomment'>/// the array is `arraysz`. If the supplied `array` is too large, the remainer is filled in with the type&#39;s</span>
-<span class='doccomment'>/// default value; if it is too small, the excess elements are discarded.</span>
+<span class='doccomment'>/// the array is `arraysz`. If the supplied `array` is too large, the remainer is filled in with the</span>
+<span class='doccomment'>/// default value (if provided); if it is too small, the excess elements are discarded.</span>
 <span class='doccomment'>///</span>
+<span class='doccomment'>/// If the provided array is too large and there is no default, then decoding fails with an `InvalidLen` error.</span>
 <span class='doccomment'>/// All the elements in `array` will be initialized after a successful return.</span>
-<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>unpack_array</span><span class='op'>&lt;</span><span class='ident'>In</span>: <span class='ident'>Read</span>, <span class='ident'>T</span>: <span class='ident'>Unpack</span><span class='op'>&lt;</span><span class='ident'>In</span><span class='op'>&gt;</span> <span class='op'>+</span> <span class='ident'>Default</span><span class='op'>&gt;</span>(<span class='ident'>input</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>In</span>, <span class='ident'>array</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>T</span>], <span class='ident'>arraysz</span>: <span class='ident'>usize</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>unpack_array</span><span class='op'>&lt;</span><span class='ident'>In</span>, <span class='ident'>T</span><span class='op'>&gt;</span>(<span class='ident'>input</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>In</span>, <span class='ident'>array</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>T</span>], <span class='ident'>arraysz</span>: <span class='ident'>usize</span>, <span class='ident'>defl</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>T</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span>
+    <span class='kw'>where</span> <span class='ident'>In</span>: <span class='ident'>Read</span>, <span class='ident'>T</span>: <span class='ident'>Unpack</span><span class='op'>&lt;</span><span class='ident'>In</span><span class='op'>&gt;</span> <span class='op'>+</span> <span class='ident'>Clone</span>
+{
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>rsz</span> <span class='op'>=</span> <span class='number'>0</span>;
     <span class='kw'>let</span> <span class='ident'>sz</span> <span class='op'>=</span> <span class='ident'>min</span>(<span class='ident'>arraysz</span>, <span class='ident'>array</span>.<span class='ident'>len</span>());
 
@@ -1000,8 +1028,12 @@
 
     <span class='comment'>// Fill in excess array entries with default values</span>
     <span class='kw'>if</span> <span class='ident'>arraysz</span> <span class='op'>&lt;</span> <span class='ident'>array</span>.<span class='ident'>len</span>() {
-        <span class='kw'>for</span> <span class='ident'>elem</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>array</span>[<span class='ident'>arraysz</span>..] {
-            <span class='op'>*</span><span class='ident'>elem</span> <span class='op'>=</span> <span class='ident'>T</span>::<span class='ident'>default</span>();
+        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>(<span class='ident'>defl</span>) <span class='op'>=</span> <span class='ident'>defl</span> {
+            <span class='kw'>for</span> <span class='ident'>elem</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>array</span>[<span class='ident'>arraysz</span>..] {
+                <span class='op'>*</span><span class='ident'>elem</span> <span class='op'>=</span> <span class='ident'>defl</span>.<span class='ident'>clone</span>();
+            }
+        } <span class='kw'>else</span> {
+            <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>InvalidLen</span>)
         }
     }
 

@@ -46,11 +46,13 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-336' class='srclink' href='../src/xdr_codec/src/lib.rs.html#184-198' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn pack_array&lt;Out: <a class='trait' href='../xdr_codec/trait.Write.html' title='xdr_codec::Write'>Write</a>, T: <a class='trait' href='../xdr_codec/trait.Pack.html' title='xdr_codec::Pack'>Pack</a>&lt;Out&gt; + <a class='trait' href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a>&gt;(val: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a>T<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>, out: &amp;mut Out) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;</pre><div class='docblock'><p>Pack a fixed-size array.</p>
+        </span><a id='src-336' class='srclink' href='../src/xdr_codec/src/lib.rs.html#186-207' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn pack_array&lt;Out, T&gt;(val: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a>T<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>, out: &amp;mut Out, defl: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;T&gt;) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt; <span class='where'>where Out: <a class='trait' href='../xdr_codec/trait.Write.html' title='xdr_codec::Write'>Write</a>, T: <a class='trait' href='../xdr_codec/trait.Pack.html' title='xdr_codec::Pack'>Pack</a>&lt;Out&gt;</span></pre><div class='docblock'><p>Pack a fixed-size array.</p>
 
 <p>As the size is fixed, it doesn&#39;t need to be encoded. <code>sz</code> is in units of array elements.
-If the <code>val</code> is too large, it is truncated; it is too small, then the array is padded out with default values.</p>
+If the <code>val</code> is too large, it is truncated; it is too small, then the array is padded out with
+default values (if provided). If the array is too small and there&#39;s no pad/default value, then it fails
+with <code>Error::InvalidLen</code>.</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 
