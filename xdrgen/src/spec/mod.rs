@@ -130,6 +130,42 @@ impl Type {
         }
     }
 
+    fn is_copyable(&self, symtab: &Symtab) -> bool {
+        use self::Type::*;
+        use self::Decl::*;
+
+        let declcopy = |d| {
+            match d {
+                &Void => true,
+                &Named(_, ref ty) => ty.is_copyable(symtab),
+            }
+        };
+
+        match self {
+            &Array(box Opaque, _) | &Array(box String, _) => true,
+            &Array(box ref ty, _) => ty.is_copyable(symtab),
+            &Flex(..) => false,
+            &Enum(_) => true,
+
+            &Option(ref ty) => ty.is_copyable(symtab),
+
+            &Struct(ref fields) =>
+                fields.iter().all(|f| declcopy(f)),
+
+            &Union(_, ref cases, ref defl) =>
+                cases.iter().map(|c| &c.1).all(|d| declcopy(d)) &&
+                defl.as_ref().map_or(true, |d| declcopy(&*d)),
+
+            &Ident(ref id) =>
+                match symtab.typespec(id) {
+                    None => false,  // unknown, really
+                    Some(ref ty) => ty.is_copyable(symtab),
+                },
+
+            _ => self.is_prim(symtab),
+        }
+    }
+
     fn packer(&self, val: Vec<rustast::TokenTree>, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
               -> Result<Vec<rustast::TokenTree>> {
         use self::Type::*;
@@ -416,8 +452,13 @@ impl Emit for Typespec {
                         .map(|res| res.map(|(field, ty)|
                                            quote_tokens!(ctxt, pub $field: $ty,)))));
 
+                let derive = if ty.is_copyable(symtab) {
+                    quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone, Copy)])
+                } else {
+                    quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)])
+                };
                 quote_item!(ctxt,
-                            #[derive(Debug, Eq, PartialEq, Clone)]
+                            $derive
                             pub struct $name { $decls }).unwrap()
             },
 
@@ -509,8 +550,13 @@ impl Emit for Typespec {
                     }
                 }
 
+                let derive = if ty.is_copyable(symtab) {
+                    quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone, Copy)])
+                } else {
+                    quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)])
+                };
                 quote_item!(ctxt,
-                            #[derive(Debug, Eq, PartialEq, Clone)]
+                            $derive
                             pub enum $name { $cases }).unwrap()
             },
 
