@@ -82,13 +82,6 @@ fn quickcheck_short_unpack_t<T>()
 }
 
 #[test]
-fn quickcheck_pack_iu8() {
-    // Special case i8/u8 since they're not packed.
-    quickcheck(pack as fn(Vec<i8>) -> bool);
-    quickcheck(pack as fn(Vec<u8>) -> bool);
-}
-
-#[test]
 fn quickcheck_pack_ui32() {
     quickcheck_pack_t::<i32>();
     quickcheck_pack_t::<u32>();
@@ -108,12 +101,6 @@ fn quickcheck_pack_float() {
 }
 
 #[test]
-fn quickcheck_codec_iu8() {
-    quickcheck_codec_t::<i8>();
-    quickcheck_codec_t::<u8>();
-}
-
-#[test]
 fn quickcheck_codec_ui32() {
     quickcheck_codec_t::<i32>();
     quickcheck_codec_t::<u32>();
@@ -130,12 +117,6 @@ fn quickcheck_codec_iu64() {
 fn quickcheck_codec_float() {
     quickcheck_codec_t::<f32>();
     quickcheck_codec_t::<f64>();
-}
-
-#[test]
-fn quickcheck_short_unpack_iu8() {
-    quickcheck_short_unpack_t::<i8>();
-    quickcheck_short_unpack_t::<u8>();
 }
 
 #[test]
