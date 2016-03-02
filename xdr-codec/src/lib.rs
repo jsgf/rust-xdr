@@ -180,8 +180,12 @@ pub fn pack<Out: Write, T: Pack<Out>>(val: &T, out: &mut Out) -> Result<()> {
 /// Pack a fixed-size array.
 ///
 /// As the size is fixed, it doesn't need to be encoded. `sz` is in units of array elements.
-/// If the `val` is too large, it is truncated; it is too small, then the array is padded out with default values.
-pub fn pack_array<Out: Write, T: Pack<Out> + Default>(val: &[T], sz: usize, out: &mut Out) -> Result<usize> {
+/// If the `val` is too large, it is truncated; it is too small, then the array is padded out with
+/// default values (if provided). If the array is too small and there's no pad/default value, then it fails
+/// with `Error::InvalidLen`.
+pub fn pack_array<Out, T>(val: &[T], sz: usize, out: &mut Out, defl: Option<&T>) -> Result<usize>
+    where Out: Write, T: Pack<Out>
+{
     let mut vsz = 0;
     let val = &val[..min(sz, val.len())];
 
@@ -190,10 +194,15 @@ pub fn pack_array<Out: Write, T: Pack<Out> + Default>(val: &[T], sz: usize, out:
     }
     assert!(vsz % 4 == 0);
 
-    for _ in val.len()..sz {
-        vsz += try!(T::default().pack(out))
+    if val.len() < sz {
+        if let Some(defl) = defl {
+            for _ in val.len()..sz {
+                vsz += try!(defl.pack(out))
+            }
+        } else {
+            return Err(Error::InvalidLen)
+        }
     }
-
     Ok(vsz)
 }
 
@@ -250,11 +259,14 @@ pub fn pack_string<Out: Write>(val: &str, maxsz: Option<usize>, out: &mut Out) -
 /// Unpack a fixed-sized array
 ///
 /// Unpack a fixed-size array of elements. The results are placed in `array`, but the actual wire-size of
-/// the array is `arraysz`. If the supplied `array` is too large, the remainer is filled in with the type's
-/// default value; if it is too small, the excess elements are discarded.
+/// the array is `arraysz`. If the supplied `array` is too large, the remainer is filled in with the
+/// default value (if provided); if it is too small, the excess elements are discarded.
 ///
+/// If the provided array is too large and there is no default, then decoding fails with an `InvalidLen` error.
 /// All the elements in `array` will be initialized after a successful return.
-pub fn unpack_array<In: Read, T: Unpack<In> + Default>(input: &mut In, array: &mut [T], arraysz: usize) -> Result<usize> {
+pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl: Option<&T>) -> Result<usize>
+    where In: Read, T: Unpack<In> + Clone
+{
     let mut rsz = 0;
     let sz = min(arraysz, array.len());
 
@@ -266,8 +278,12 @@ pub fn unpack_array<In: Read, T: Unpack<In> + Default>(input: &mut In, array: &m
 
     // Fill in excess array entries with default values
     if arraysz < array.len() {
-        for elem in &mut array[arraysz..] {
-            *elem = T::default();
+        if let Some(defl) = defl {
+            for elem in &mut array[arraysz..] {
+                *elem = defl.clone();
+            }
+        } else {
+            return Err(Error::InvalidLen)
         }
     }
 

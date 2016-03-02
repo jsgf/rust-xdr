@@ -469,7 +469,7 @@ fn basic_array() {
         let a = [0x11u32, 0x22, 0x33];
 
 
-        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 3*4);
+        assert_eq!(pack_array(&a, a.len(), &mut out, Some(&0)).unwrap(), 3*4);
 
         let v = out.into_inner();
 
@@ -480,7 +480,7 @@ fn basic_array() {
 
         let mut input = Cursor::new(v);
         let mut b = [0u32; 3];
-        let bsz = unpack_array(&mut input, &mut b[..], 3).expect("unpack failed");
+        let bsz = unpack_array(&mut input, &mut b[..], 3, Some(&0)).expect("unpack failed");
         assert_eq!(bsz, 4*3);
         assert_eq!(&a[..], &b[..]);
     }
@@ -489,7 +489,7 @@ fn basic_array() {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u32, 0x22, 0x33, 0x44];
 
-        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 4*4);
+        assert_eq!(pack_array(&a, a.len(), &mut out, Some(&0)).unwrap(), 4*4);
 
         let v = out.into_inner();
 
@@ -499,7 +499,7 @@ fn basic_array() {
 
         let mut input = Cursor::new(v);
         let mut b = [0u32; 3];
-        let bsz = unpack_array(&mut input, &mut b[..], 4).expect("unpack_array");
+        let bsz = unpack_array(&mut input, &mut b[..], 4, Some(&0)).expect("unpack_array");
         assert_eq!(bsz, 4*4);
         assert_eq!(&a[..3], &b[..]);
     }
@@ -508,7 +508,7 @@ fn basic_array() {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u32, 0x22, 0x33, 0x44, 0x55];
 
-        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 5*4);
+        assert_eq!(pack_array(&a, a.len(), &mut out, Some(&0)).unwrap(), 5*4);
 
         let v = out.into_inner();
 
@@ -521,7 +521,7 @@ fn basic_array() {
 
         let mut input = Cursor::new(v);
         let mut b = [0u32; 5];
-        let bsz = unpack_array(&mut input, &mut b[..], a.len()).expect("unpack_array");
+        let bsz = unpack_array(&mut input, &mut b[..], a.len(), Some(&0)).expect("unpack_array");
         assert_eq!(bsz, 5*4);
         assert_eq!(&a[..], &b[..]);
     }
@@ -530,7 +530,7 @@ fn basic_array() {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u32, 0x22, 0x33, 0x44, 0x55];
 
-        assert_eq!(pack_array(&a, 4, &mut out).unwrap(), 4*4);
+        assert_eq!(pack_array(&a, 4, &mut out, Some(&0)).unwrap(), 4*4);
 
         let v = out.into_inner();
 
@@ -542,7 +542,7 @@ fn basic_array() {
 
         let mut input = Cursor::new(v);
         let mut b = [0u32; 4];
-        let bsz = unpack_array(&mut input, &mut b[..], 4).expect("unpack_array");
+        let bsz = unpack_array(&mut input, &mut b[..], 4, Some(&0)).expect("unpack_array");
         assert_eq!(bsz, 4*4);
         assert_eq!(&a[..4], &b[..]);
     }
@@ -551,7 +551,7 @@ fn basic_array() {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u32, 0x22, 0x33];
 
-        assert_eq!(pack_array(&a, 4, &mut out).unwrap(), 4*4);
+        assert_eq!(pack_array(&a, 4, &mut out, Some(&0)).unwrap(), 4*4);
 
         let v = out.into_inner();
 
@@ -563,7 +563,7 @@ fn basic_array() {
 
         let mut input = Cursor::new(v);
         let mut b = [0u32; 4];
-        let bsz = unpack_array(&mut input, &mut b[..], 4).expect("unpack_array");
+        let bsz = unpack_array(&mut input, &mut b[..], 4, Some(&0)).expect("unpack_array");
         assert_eq!(bsz, 4*4);
         assert_eq!(vec![0x11,0x22,0x33,0x00], b);
     }

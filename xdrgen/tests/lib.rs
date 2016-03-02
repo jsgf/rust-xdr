@@ -232,6 +232,7 @@ fn arrays() {
         struct a { opaque data[15]; };
         struct b { int things[10]; };
         struct c { string decitweet[14]; };
+        struct d { c tweetses[10]; };
     "#;
 
     if let Err(e) = build_test(name, spec) {

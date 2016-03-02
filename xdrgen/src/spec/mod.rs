@@ -173,7 +173,7 @@ impl Type {
 
             &Array(box Opaque, _) | &Array(box String, _) =>
                 quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_array(&$val[..], $val.len(), out))),
-            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], $val.len(), out))),
+            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], $val.len(), out, None))),
 
             _ => quote_tokens!(ctxt, try!($val.pack(out))),
         };
@@ -216,7 +216,7 @@ impl Type {
                 quote_tokens!(ctxt, {
                     use std::mem;
                     let mut buf: [$ty; $value as usize] = unsafe { mem::uninitialized() };
-                    let sz = try!(xdr_codec::unpack_array(input, &mut buf[..], $value as usize));
+                    let sz = try!(xdr_codec::unpack_array(input, &mut buf[..], $value as usize, None));
                     (buf, sz)
                 })
             },
