@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `pack_array` fn in crate `xdr_codec`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, pack_array">
+    <meta name="description" content="API documentation for the Rust `unpack_array` fn in crate `xdr_codec`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, unpack_array">
 
-    <title>xdr_codec::pack_array - Rust</title>
+    <title>xdr_codec::unpack_array - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../rustdoc.css">
     <link rel="stylesheet" type="text/css" href="../main.css">
@@ -27,7 +27,7 @@
 
     <nav class="sidebar">
         
-        <p class='location'><a href='index.html'>xdr_codec</a></p><script>window.sidebarCurrent = {name: 'pack_array', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='index.html'>xdr_codec</a></p><script>window.sidebarCurrent = {name: 'unpack_array', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </nav>
 
     <nav class="sub">
@@ -42,15 +42,14 @@
     </nav>
 
     <section id='main' class="content fn">
-<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>xdr_codec</a>::<wbr><a class='fn' href=''>pack_array</a></span><span class='out-of-band'><span id='render-detail'>
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>xdr_codec</a>::<wbr><a class='fn' href=''>unpack_array</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-336' class='srclink' href='../src/xdr_codec/src/lib.rs.html#184-198' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn pack_array&lt;Out: <a class='trait' href='../xdr_codec/trait.Write.html' title='xdr_codec::Write'>Write</a>, T: <a class='trait' href='../xdr_codec/trait.Pack.html' title='xdr_codec::Pack'>Pack</a>&lt;Out&gt; + <a class='trait' href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a>&gt;(val: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a>T<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>, out: &amp;mut Out) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;</pre><div class='docblock'><p>Pack a fixed-size array.</p>
+        </span><a id='src-388' class='srclink' href='../src/xdr_codec/src/lib.rs.html#253-265' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn unpack_array&lt;In: <a class='trait' href='../xdr_codec/trait.Read.html' title='xdr_codec::Read'>Read</a>, T: <a class='trait' href='../xdr_codec/trait.Unpack.html' title='xdr_codec::Unpack'>Unpack</a>&lt;In&gt;&gt;(input: &amp;mut In, sz: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='type' href='../xdr_codec/type.Result.html' title='xdr_codec::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(</a><a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;T&gt;, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>)</a>&gt;</pre><div class='docblock'><p>Unpack a fixed-sized array</p>
 
-<p>As the size is fixed, it doesn&#39;t need to be encoded. <code>sz</code> is in units of array elements.
-If the <code>val</code> is too large, it is truncated; it is too small, then the array is padded out with default values.</p>
+<p>Unpack a fixed-size array of elements.</p>
 </div></section>
     <section id='search' class="content hidden"></section>
 

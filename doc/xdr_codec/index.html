@@ -46,7 +46,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-0' class='srclink' href='../src/xdr_codec/src/lib.rs.html#1-515' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/xdr_codec/src/lib.rs.html#1-649' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>XDR runtime encoding/decoding</p>
 
 <p>This crate provides runtime support for encoding and decoding XDR
@@ -63,6 +63,15 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                                title='xdr_codec::record'>record</a></td>
                         <td class='docblock short'>
                              <p>XDR record marking</p>
+                        </td>
+                    </tr>
+                </table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.Opaque.html'
+                               title='xdr_codec::Opaque'>Opaque</a></td>
+                        <td class='docblock short'>
+                             <p>Wrapper for XDR opaque data.</p>
                         </td>
                     </tr>
                 </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
@@ -126,10 +135,42 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                     </tr>
                 
                     <tr class=' module-item'>
+                        <td><a class='fn' href='fn.pack_flex.html'
+                               title='xdr_codec::pack_flex'>pack_flex</a></td>
+                        <td class='docblock short'>
+                             <p>Pack a dynamically sized array, with size limit check.</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.pack_opaque_array.html'
+                               title='xdr_codec::pack_opaque_array'>pack_opaque_array</a></td>
+                        <td class='docblock short'>
+                             <p>Pack a fixed-size byte array</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.pack_opaque_flex.html'
+                               title='xdr_codec::pack_opaque_flex'>pack_opaque_flex</a></td>
+                        <td class='docblock short'>
+                             <p>Pack a dynamically sized opaque array, with size limit check.</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.pack_string.html'
+                               title='xdr_codec::pack_string'>pack_string</a></td>
+                        <td class='docblock short'>
+                             <p>Pack a string with size limit check.</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
                         <td><a class='fn' href='fn.padding.html'
                                title='xdr_codec::padding'>padding</a></td>
                         <td class='docblock short'>
-                             <p>XDR padding</p>
+                             <p>Compute XDR padding.</p>
                         </td>
                     </tr>
                 
@@ -142,10 +183,34 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                     </tr>
                 
                     <tr class=' module-item'>
-                        <td><a class='fn' href='fn.unpack_flex_array.html'
-                               title='xdr_codec::unpack_flex_array'>unpack_flex_array</a></td>
+                        <td><a class='fn' href='fn.unpack_array.html'
+                               title='xdr_codec::unpack_array'>unpack_array</a></td>
                         <td class='docblock short'>
-                             <p>Unpack a length-limited array</p>
+                             <p>Unpack a fixed-sized array</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.unpack_flex.html'
+                               title='xdr_codec::unpack_flex'>unpack_flex</a></td>
+                        <td class='docblock short'>
+                             <p>Unpack a (perhaps) length-limited array</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.unpack_opaque_array.html'
+                               title='xdr_codec::unpack_opaque_array'>unpack_opaque_array</a></td>
+                        <td class='docblock short'>
+                             <p>Unpack a fixed-sized opaque array</p>
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.unpack_opaque_flex.html'
+                               title='xdr_codec::unpack_opaque_flex'>unpack_opaque_flex</a></td>
+                        <td class='docblock short'>
+                             <p>Unpack a (perhaps) length-limited opaque array</p>
                         </td>
                     </tr>
                 
@@ -153,7 +218,7 @@ functions <code>pack()</code> and <code>unpack()</code> to simplify the API.</p>
                         <td><a class='fn' href='fn.unpack_string.html'
                                title='xdr_codec::unpack_string'>unpack_string</a></td>
                         <td class='docblock short'>
-                             <p>Unpack length-limited string</p>
+                             <p>Unpack (perhaps) length-limited string</p>
                         </td>
                     </tr>
                 </table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
