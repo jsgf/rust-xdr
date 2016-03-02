@@ -245,6 +245,7 @@ fn flex() {
     let spec = r#"
         struct a { opaque data<>; opaque limdata<15>; };
         struct b { string s<>; string limstr<32>; };
+        struct c { a athing<>; a alim<10>; };
     "#;
 
     if let Err(e) = build_test(name, spec) {

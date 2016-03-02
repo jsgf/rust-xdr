@@ -168,7 +168,7 @@ impl Type {
                         quote_tokens!(ctxt, Some($mx as usize))
                     },
                 };
-                quote_tokens!(ctxt, try!(xdr_codec::pack_flex($val, $maxsz, out)))
+                quote_tokens!(ctxt, try!(xdr_codec::pack_flex(&$val, $maxsz, out)))
             },
 
             &Array(box Opaque, _) | &Array(box String, _) =>
