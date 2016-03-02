@@ -14,7 +14,7 @@ fn build_test(name: &str, xdr_spec: &str) -> Result<()> {
     let dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let _ = create_dir_all(&dir);
-    
+
     let mainfile = dir.with_file_name(format!("{}.rs", name));
     let testfile = dir.with_file_name(format!("{}_xdr.rs", name));
     let exefile = dir.with_file_name(format!("{}", name));
@@ -54,7 +54,7 @@ fn main() {{}}
              String::from_utf8_lossy(&compile.stderr));
 
     if compile.status.success() {
-        Ok(())        
+        Ok(())
     } else {
         Err(Error::Generic("couldn't compile".to_string()))
     }
@@ -170,7 +170,7 @@ fn rfc4506() {
         panic!("test {} failed: {}", name, e);
     }
 }
-    
+
 #[test]
 fn enums() {
     let name = "enums";
@@ -232,6 +232,19 @@ fn arrays() {
         struct a { opaque data[15]; };
         struct b { int things[10]; };
         struct c { string decitweet[14]; };
+    "#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
+
+#[test]
+fn flex() {
+    let name = "flex";
+    let spec = r#"
+        struct a { opaque data<>; opaque limdata<15>; };
+        struct b { string s<>; string limstr<32>; };
     "#;
 
     if let Err(e) = build_test(name, spec) {
