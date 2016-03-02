@@ -203,7 +203,7 @@ impl Type {
 
                 quote_tokens!(ctxt, {
                     use std::mem;
-                    let buf: [u8; $value as usize] = unsafe { mem::uninitialized() };
+                    let mut buf: [u8; $value as usize] = unsafe { mem::uninitialized() };
                     let sz = try!(xdr_codec::unpack_opaque_array(input, &mut buf[..], $value as usize));
                     (buf, sz)
                 })
@@ -215,7 +215,7 @@ impl Type {
 
                 quote_tokens!(ctxt, {
                     use std::mem;
-                    let buf: [$ty; $value as usize] = unsafe { mem::uninitialized() };
+                    let mut buf: [$ty; $value as usize] = unsafe { mem::uninitialized() };
                     let sz = try!(xdr_codec::unpack_array(input, &mut buf[..], $value as usize));
                     (buf, sz)
                 })
