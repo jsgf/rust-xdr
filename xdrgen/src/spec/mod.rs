@@ -171,7 +171,9 @@ impl Type {
                 quote_tokens!(ctxt, try!(xdr_codec::pack_flex($val, $maxsz, out)))
             },
 
-            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], out))),
+            &Array(box Opaque, _) | &Array(box String, _) =>
+                quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_array(&$val[..], $val.len(), out))),
+            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], $val.len(), out))),
 
             _ => quote_tokens!(ctxt, try!($val.pack(out))),
         };
@@ -196,32 +198,27 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Array(box Opaque, ref value) => {
-                let elems = value.as_i64(symtab).unwrap();
-                let mut unpacks = Vec::new();
+            &Array(box Opaque, ref value) | &Array(box String, ref value) => {
+                let value = value.as_token(symtab, ctxt);
 
-                // I think this is the only way to safely initialize a fixed-sized array in
-                // Rust. The alternative would be to use a Vec<>, but this would need to deal with a
-                // wrong-sized value, and an extra indirection.
-                for _ in 0..elems {
-                    unpacks.push(quote_tokens!(ctxt, { let v = try!(input.read_u8()); asz += 1; v },));
-                }
-
-                quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
+                quote_tokens!(ctxt, {
+                    use std::mem;
+                    let buf: [u8; $value as usize] = unsafe { mem::uninitialized() };
+                    let sz = try!(xdr_codec::unpack_opaque_array(input, &mut buf[..], $value as usize));
+                    (buf, sz)
+                })
             },
 
-            &Array(_, ref value) => {
-                let elems = value.as_i64(symtab).unwrap();
-                let mut unpacks = Vec::new();
+            &Array(ref ty, ref value) => {
+                let value = value.as_token(symtab, ctxt);
+                let ty = ty.as_token(symtab, ctxt).unwrap();
 
-                // I think this is the only way to safely initialize a fixed-sized array in
-                // Rust. The alternative would be to use a Vec<>, but this would need to deal with a
-                // wrong-sized value, and an extra indirection.
-                for _ in 0..elems {
-                    unpacks.push(quote_tokens!(ctxt, { let (v, esz) = try!(xdr_codec::Unpack::unpack(input)); asz += esz; v },));
-                }
-
-                quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
+                quote_tokens!(ctxt, {
+                    use std::mem;
+                    let buf: [$ty; $value as usize] = unsafe { mem::uninitialized() };
+                    let sz = try!(xdr_codec::unpack_array(input, &mut buf[..], $value as usize));
+                    (buf, sz)
+                })
             },
 
             &Flex(box String, ref maxsz) => {

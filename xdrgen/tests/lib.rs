@@ -224,3 +224,17 @@ fn consts() {
         panic!("test {} failed: {}", name, e);
     }
 }
+
+#[test]
+fn arrays() {
+    let name = "arrays";
+    let spec = r#"
+        struct a { opaque data[15]; };
+        struct b { int things[10]; };
+        struct c { string decitweet[14]; };
+    "#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
