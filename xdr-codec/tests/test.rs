@@ -1,26 +1,9 @@
 extern crate xdr_codec;
 
 use std::io::Cursor;
-use xdr_codec::{Pack, Unpack, pack_array, unpack_string, unpack_flex_array, Error};
-
-#[test]
-fn basic_8() {
-    let mut out = Cursor::new(Vec::new());
-
-    assert_eq!(0u8.pack(&mut out).unwrap(), 1);
-    assert_eq!(0xaau8.pack(&mut out).unwrap(), 1);
-    assert_eq!(0x34u8.pack(&mut out).unwrap(), 1);
-
-    let v = out.into_inner();
-
-    assert_eq!(v.len(), 3);
-    assert_eq!(v, vec![0, 0xaa, 0x34]);
-
-    let mut input = Cursor::new(v);
-    assert_eq!(Unpack::unpack(&mut input).unwrap(), (0u8, 1));
-    assert_eq!(Unpack::unpack(&mut input).unwrap(), (0xaau8, 1));
-    assert_eq!(Unpack::unpack(&mut input).unwrap(), (0x34u8, 1));
-}
+use xdr_codec::{Error, Pack, Unpack, Opaque,
+                pack_flex, pack_opaque_flex, pack_string, pack_array, pack_opaque_array,
+                unpack_array, unpack_opaque_array, unpack_string, unpack_flex, unpack_opaque_flex};
 
 #[test]
 fn basic_32() {
@@ -181,11 +164,99 @@ fn basic_string() {
 }
 
 #[test]
+fn basic_flex() {
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u32, 0x22, 0x33, 0x44].pack(&mut out).unwrap(), 4*4 + 4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*4 + 4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x04,
+                           0x00, 0x00, 0x00, 0x11,  0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33,  0x00, 0x00, 0x00, 0x44]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u32, 0x22, 0x33, 0x44], 4*4+4));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u32, 0x22].pack(&mut out).unwrap(), 2*4+4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 2*4+4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x02,
+                           0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u32, 0x22], 4*2+4));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u32, 0x22, 0x00].pack(&mut out).unwrap(), 3*4+4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 3*4+4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x03,
+                           0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x00]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u32, 0x22, 0x00], 3*4+4));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u32, 0x22, 0x33].pack(&mut out).unwrap(), 3*4+4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 3*4+4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x03,
+                           0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u32, 0x22, 0x33], 3*4+4));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(vec![0x11u32, 0x22, 0x33, 0x44, 0x55].pack(&mut out).unwrap(), 4*5+4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*5+4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x05,
+                           0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33,
+                           0x00, 0x00, 0x00, 0x44,
+                           0x00, 0x00, 0x00, 0x55]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u32, 0x22, 0x33, 0x44, 0x55], 5*4+4));
+    }
+}
+
+#[test]
 fn basic_opaque_flex() {
     {
         let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22, 0x33, 0x44].pack(&mut out).unwrap(), 8);
+        assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22, 0x33, 0x44]).pack(&mut out).unwrap(), 8);
 
         let v = out.into_inner();
 
@@ -193,13 +264,13 @@ fn basic_opaque_flex() {
         assert_eq!(v, vec![0x00, 0x00, 0x00, 0x04, 0x11, 0x22, 0x33, 0x44]);
 
         let mut input = Cursor::new(v);
-        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44], 8));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (Opaque::borrowed(&vec![0x11u8, 0x22, 0x33, 0x44]), 8));
     }
 
     {
         let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22].pack(&mut out).unwrap(), 8);
+        assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22]).pack(&mut out).unwrap(), 8);
 
         let v = out.into_inner();
 
@@ -207,13 +278,13 @@ fn basic_opaque_flex() {
         assert_eq!(v, vec![0x00, 0x00, 0x00, 0x02, 0x11, 0x22, 0x00, 0x00]);
 
         let mut input = Cursor::new(v);
-        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22], 8));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (Opaque::borrowed(&vec![0x11u8, 0x22]), 8));
     }
 
     {
         let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22, 0x00].pack(&mut out).unwrap(), 8);
+        assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22, 0x00]).pack(&mut out).unwrap(), 8);
 
         let v = out.into_inner();
 
@@ -221,13 +292,13 @@ fn basic_opaque_flex() {
         assert_eq!(v, vec![0x00, 0x00, 0x00, 0x03, 0x11, 0x22, 0x00, 0x00]);
 
         let mut input = Cursor::new(v);
-        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x00], 8));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (Opaque::borrowed(&vec![0x11u8, 0x22, 0x00]), 8));
     }
 
     {
         let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22, 0x33].pack(&mut out).unwrap(), 8);
+        assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22, 0x33]).pack(&mut out).unwrap(), 8);
 
         let v = out.into_inner();
 
@@ -235,13 +306,13 @@ fn basic_opaque_flex() {
         assert_eq!(v, vec![0x00, 0x00, 0x00, 0x03, 0x11, 0x22, 0x33, 0x00]);
 
         let mut input = Cursor::new(v);
-        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x33], 8));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (Opaque::borrowed(&vec![0x11u8, 0x22, 0x33]), 8));
     }
 
     {
         let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22, 0x33, 0x44, 0x55].pack(&mut out).unwrap(), 12);
+        assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22, 0x33, 0x44, 0x55]).pack(&mut out).unwrap(), 12);
 
         let v = out.into_inner();
 
@@ -249,50 +320,174 @@ fn basic_opaque_flex() {
         assert_eq!(v, vec![0x00, 0x00, 0x00, 0x05, 0x11, 0x22, 0x33, 0x44, 0x55, 0x00, 0x00, 0x00]);
 
         let mut input = Cursor::new(v);
-        assert_eq!(Unpack::unpack(&mut input).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44, 0x55], 12));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (Opaque::borrowed(&vec![0x11u8, 0x22, 0x33, 0x44, 0x55]), 12));
     }
 }
 
 #[test]
 fn bounded_flex() {
-        let mut out = Cursor::new(Vec::new());
+    let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(vec![0x11u8, 0x22, 0x33, 0x44, 0x55].pack(&mut out).unwrap(), 12);
+    assert_eq!(vec![0x11u32, 0x22, 0x33, 0x44, 0x55].pack(&mut out).unwrap(), 4*5+4);
 
-        let v = out.into_inner();
+    let v = out.into_inner();
 
-        {
-            let mut input = Cursor::new(v.clone());
-            assert_eq!(unpack_flex_array(&mut input, 10).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44, 0x55], 12));
+    {
+        let mut input = Cursor::new(v.clone());
+        assert_eq!(unpack_flex(&mut input, Some(10)).unwrap(), (vec![0x11u32, 0x22, 0x33, 0x44, 0x55], 5*4+4));
+    }
+    {
+        let mut input = Cursor::new(v.clone());
+        match unpack_flex::<_, Vec<u32>>(&mut input, Some(4)) {
+            Result::Err(Error::InvalidLen) => (),
+            e => panic!("Unexpected {:?}", e),
         }
-        {
-            let mut input = Cursor::new(v.clone());
-            match unpack_flex_array::<_, u8>(&mut input, 4) {
-                Result::Err(Error::InvalidLen) => (),
-                e => panic!("Unexpected {:?}", e),
-            }
+    }
+}
+
+#[test]
+fn bounded_opaque_flex() {
+    let mut out = Cursor::new(Vec::new());
+
+    assert_eq!(Opaque::borrowed(&vec![0x11u8, 0x22, 0x33, 0x44, 0x55]).pack(&mut out).unwrap(), 12);
+
+    let v = out.into_inner();
+
+    {
+        let mut input = Cursor::new(v.clone());
+        assert_eq!(unpack_opaque_flex(&mut input, Some(10)).unwrap(), (vec![0x11u8, 0x22, 0x33, 0x44, 0x55], 12));
+    }
+    {
+        let mut input = Cursor::new(v.clone());
+        match unpack_opaque_flex(&mut input, Some(4)) {
+            Result::Err(Error::InvalidLen) => (),
+            e => panic!("Unexpected {:?}", e),
         }
+    }
 }
 
 #[test]
 fn bounded_string() {
-        let mut out = Cursor::new(Vec::new());
+    let mut out = Cursor::new(Vec::new());
 
-        assert_eq!(String::from("hello, world").pack(&mut out).unwrap(), 16);
+    assert_eq!(String::from("hello, world").pack(&mut out).unwrap(), 16);
+
+    let v = out.into_inner();
+
+    {
+        let mut input = Cursor::new(v.clone());
+        assert_eq!(unpack_string(&mut input, Some(16)).expect("unpack_string failed"),
+                   (String::from("hello, world"), 16));
+    }
+    {
+        let mut input = Cursor::new(v.clone());
+        match unpack_string(&mut input, Some(5)) {
+            Result::Err(Error::InvalidLen) => (),
+            e => panic!("Unexpected {:?}", e),
+        }
+    }
+}
+
+#[test]
+fn basic_array() {
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u32, 0x22, 0x33];
+
+
+        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 3*4);
 
         let v = out.into_inner();
 
-        {
-            let mut input = Cursor::new(v.clone());
-            assert_eq!(unpack_string(&mut input, 16).unwrap(), (String::from("hello, world"), 16));
-        }
-        {
-            let mut input = Cursor::new(v.clone());
-            match unpack_string(&mut input, 5) {
-                Result::Err(Error::InvalidLen) => (),
-                e => panic!("Unexpected {:?}", e),
-            }
-        }
+        assert_eq!(v.len(), 3*4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_array(&mut input, 3).expect("unpack failed");
+        assert_eq!(bsz, 4*3);
+        assert_eq!(&a[..], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u32, 0x22, 0x33, 0x44];
+
+        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 4*4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33, 0x00, 0x00, 0x00, 0x44]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_array(&mut input, 4).expect("unpack_array");
+        assert_eq!(bsz, 4*4);
+        assert_eq!(&a[..], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u32, 0x22, 0x33, 0x44, 0x55];
+
+        assert_eq!(pack_array(&a, a.len(), &mut out).unwrap(), 5*4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*5);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33,
+                           0x00, 0x00, 0x00, 0x44,
+                           0x00, 0x00, 0x00, 0x55]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_array(&mut input, a.len()).expect("unpack_array");
+        assert_eq!(bsz, 5*4);
+        assert_eq!(&a[..], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u32, 0x22, 0x33, 0x44, 0x55];
+
+        assert_eq!(pack_array(&a, 4, &mut out).unwrap(), 4*4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33,
+                           0x00, 0x00, 0x00, 0x44]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_array(&mut input, 4).expect("unpack_array");
+        assert_eq!(bsz, 4*4);
+        assert_eq!(&a[..4], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u32, 0x22, 0x33];
+
+        assert_eq!(pack_array(&a, 4, &mut out).unwrap(), 4*4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4*4);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x11,
+                           0x00, 0x00, 0x00, 0x22,
+                           0x00, 0x00, 0x00, 0x33,
+                           0x00, 0x00, 0x00, 0x00]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_array(&mut input, 4).expect("unpack_array");
+        assert_eq!(bsz, 4*4);
+        assert_eq!(vec![0x11,0x22,0x33,0x00], b);
+    }
 }
 
 #[test]
@@ -301,7 +496,8 @@ fn basic_opaque_array() {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u8, 0x22, 0x33];
 
-        assert_eq!(pack_array(&a, &mut out).unwrap(), 4);
+
+        assert_eq!(pack_opaque_array(&a, a.len(), &mut out).unwrap(), 4);
 
         let v = out.into_inner();
 
@@ -309,17 +505,16 @@ fn basic_opaque_array() {
         assert_eq!(v, vec![0x11, 0x22, 0x33, 0x00]);
 
         let mut input = Cursor::new(v);
-        let b: [u8; 3] = [Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,];
-        assert_eq!(a, b);
+        let (b, bsz) = unpack_opaque_array(&mut input, 3).expect("unpack opaque failed");
+        assert_eq!(bsz, 4);
+        assert_eq!(&a[..], &b[..]);
     }
 
     {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u8, 0x22, 0x33, 0x44];
 
-        assert_eq!(pack_array(&a, &mut out).unwrap(), 4);
+        assert_eq!(pack_opaque_array(&a, a.len(), &mut out).unwrap(), 4);
 
         let v = out.into_inner();
 
@@ -327,18 +522,16 @@ fn basic_opaque_array() {
         assert_eq!(v, vec![0x11, 0x22, 0x33, 0x44]);
 
         let mut input = Cursor::new(v);
-        let b: [u8; 4] = [Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,];
-        assert_eq!(a, b);
+        let (b, bsz) = unpack_opaque_array(&mut input, 4).expect("unpack_opaque_array");
+        assert_eq!(bsz, 4);
+        assert_eq!(&a[..], &b[..]);
     }
 
     {
         let mut out = Cursor::new(Vec::new());
         let a = [0x11u8, 0x22, 0x33, 0x44, 0x55];
 
-        assert_eq!(pack_array(&a, &mut out).unwrap(), 8);
+        assert_eq!(pack_opaque_array(&a, a.len(), &mut out).unwrap(), 8);
 
         let v = out.into_inner();
 
@@ -346,13 +539,43 @@ fn basic_opaque_array() {
         assert_eq!(v, vec![0x11, 0x22, 0x33, 0x44, 0x55, 0x00, 0x00, 0x00]);
 
         let mut input = Cursor::new(v);
-        let b: [u8; 5] = [Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          Unpack::unpack(&mut input).unwrap().0,
-                          ];
-        assert_eq!(a, b);
+        let (b, bsz) = unpack_opaque_array(&mut input, a.len()).expect("unpack_opaque_array");
+        assert_eq!(bsz, 8);
+        assert_eq!(&a[..], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u8, 0x22, 0x33, 0x44, 0x55];
+
+        assert_eq!(pack_opaque_array(&a, 4, &mut out).unwrap(), 4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4);
+        assert_eq!(v, vec![0x11, 0x22, 0x33, 0x44]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_opaque_array(&mut input, 4).expect("unpack_opaque_array");
+        assert_eq!(bsz, 4);
+        assert_eq!(&a[..4], &b[..]);
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+        let a = [0x11u8, 0x22, 0x33];
+
+        assert_eq!(pack_opaque_array(&a, 4, &mut out).unwrap(), 4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 4);
+        assert_eq!(v, vec![0x11, 0x22, 0x33, 0x00]);
+
+        let mut input = Cursor::new(v);
+        let (b, bsz) = unpack_opaque_array(&mut input, 4).expect("unpack_opaque_array");
+        assert_eq!(bsz, 4);
+        assert_eq!(vec![0x11, 0x22, 0x33, 0x00], b);
     }
 }
 
