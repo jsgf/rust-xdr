@@ -138,17 +138,37 @@ impl Type {
         let res = match self {
             &Enum(_) => { quote_tokens!(ctxt, try!((*$val as i32).pack(out))) },
 
-            &Flex(_, None) | &Option(_) =>
-                quote_tokens!(ctxt, try!($val.pack(out))),
+            &Flex(box Opaque, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_flex(&$val, $maxsz, out)))
+            },
 
-            &Flex(_, Some(ref maxsz)) => {
-                let maxsz = maxsz.as_token(symtab, ctxt);
-                quote_tokens!(ctxt,
-                              if $val.len() > ($maxsz as usize) {
-                                  return Err(xdr_codec::Error::invalidlen())
-                              } else {
-                                  try!($val.pack(out))
-                              })
+            &Flex(box String, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::pack_string(&$val, $maxsz, out)))
+            },
+
+            &Flex(_, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::pack_flex($val, $maxsz, out)))
             },
 
             &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], out))),
@@ -176,6 +196,20 @@ impl Type {
         use self::Type::*;
 
         match self {
+            &Array(box Opaque, ref value) => {
+                let elems = value.as_i64(symtab).unwrap();
+                let mut unpacks = Vec::new();
+
+                // I think this is the only way to safely initialize a fixed-sized array in
+                // Rust. The alternative would be to use a Vec<>, but this would need to deal with a
+                // wrong-sized value, and an extra indirection.
+                for _ in 0..elems {
+                    unpacks.push(quote_tokens!(ctxt, { let v = try!(input.read_u8()); asz += 1; v },));
+                }
+
+                quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
+            },
+
             &Array(_, ref value) => {
                 let elems = value.as_i64(symtab).unwrap();
                 let mut unpacks = Vec::new();
@@ -190,15 +224,28 @@ impl Type {
                 quote_tokens!(ctxt, { let mut asz = 0; let v = [ $unpacks ]; (v, asz) })
             },
 
-
-            &Flex(box String, Some(ref maxsz)) => {
-                let maxsz = maxsz.as_token(symtab, ctxt);
-                quote_tokens!(ctxt, try!(xdr_codec::unpack_string(input, $maxsz as usize)))
+            &Flex(box String, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::unpack_string(input, $maxsz)))
             },
 
-            &Flex(_, Some(ref maxsz)) => {
-                let maxsz = maxsz.as_token(symtab, ctxt);
-                quote_tokens!(ctxt, try!(xdr_codec::unpack_flex_array(input, $maxsz as usize)))
+            &Flex(box Opaque, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::unpack_opaque_flex(input, $maxsz)))
+            },
+
+            &Flex(_, ref maxsz) => {
+                let maxsz = match maxsz {
+                    &None => quote_tokens!(ctxt, None),
+                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                };
+                quote_tokens!(ctxt, try!(xdr_codec::unpack_flex(input, $maxsz)))
             },
 
             _ => quote_tokens!(ctxt, try!(xdr_codec::Unpack::unpack(input))),
@@ -542,6 +589,9 @@ impl Emitpack for Typespec {
                 quote_tokens!(ctxt, match self { $matches })
             },
 
+            &Flex(box Opaque, _) =>
+                quote_tokens!(ctxt, try!(xdr_codec::Opaque::borrowed(self).pack(out))),
+
             &Ident(_) => return Ok(None),
 
             _ => {
@@ -643,11 +693,14 @@ impl Emitpack for Typespec {
                 if let &Some(box ref decl) = defl {
                     let defl = match decl {
                         &Void => quote_tokens!(ctxt, _ => $name::default),
-                        &Named(_, _) => quote_tokens!(ctxt, _ => $name::default({
-                            let (v, csz) = try!(xdr_codec::Unpack::unpack(input));
-                            sz += csz;
-                            v
-                        })),
+                        &Named(_, ref ty) => {
+                            let unpack = ty.unpacker(symtab, ctxt);
+                            quote_tokens!(ctxt, _ => $name::default({
+                                let (v, csz) = $unpack;
+                                sz += csz;
+                                v
+                            }))
+                        },
                     };
 
                     matches.push(defl);
