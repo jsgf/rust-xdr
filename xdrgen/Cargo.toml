@@ -16,6 +16,9 @@ test = false
 bench = false
 doc = false
 
+[features]
+unstable = []
+
 [dependencies]
 log = "0.3"
 env_logger = "0.3"

@@ -9,6 +9,9 @@ documentation = "https://jsgf.github.io/rust-xdr/doc/xdr_codec/index.html"
 readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 
+[features]
+unstable = []
+
 [dependencies]
 byteorder = "0.4.2"
 

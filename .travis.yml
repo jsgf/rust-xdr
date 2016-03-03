@@ -1,21 +1,43 @@
 language: rust
 
 rust:
+- stable
+- beta
 - nightly
 
+before_script:
+  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - binutils-dev # optional: only required for the --verify flag of coveralls
+
 script:
-- "(cd xdr-codec && cargo build --verbose)"
-- "(cd xdr-codec && cargo test --verbose)"
-- "(cd xdr-codec && cargo doc --no-deps --verbose)"
-- "(cd xdrgen && cargo build --verbose)"
-- "(cd xdrgen && cargo test --verbose)"
-- "(cd xdrgen && cargo doc --no-deps --verbose)"
+- |
+    cd $TRAVIS_BUILD_DIR/xdr-codec &&
+    travis-cargo build &&
+    travis-cargo test &&
+    travis-cargo --only stable doc &&
+    travis-cargo coveralls --no-sudo --verify
+- |
+    cd $TRAVIS_BUILD_DIR/xdrgen &&
+    travis-cargo --only nightly build &&
+    travis-cargo --only nightly test &&
+    travis-cargo --only nightly doc
+
+# upload coverage once work out how to deal with 2 crates
+# travis-cargo coveralls --no-sudo --verify
 
 after_success:
-- ./.travis-update-gh-pages.sh
+- cd $TRAVIS_BUILD_DIR && ./.travis-update-gh-pages.sh
 
 env:
   global:
   - GH_REPO: github.com/jsgf/rust-xdr.git
   - DOCS_OUT="xdrgen/target/doc xdr-codec/target/doc"
   - secure: CUnvQ3QAJEBfahqtsWTb72dvSB4xyebRIK3j/wwRNRP2evxwY1765VGTfV2zoPUD1MuR/8olEuHhs/b34tBMxhyMYZd2RGn+xuX4jD6aav318oVN2B4Y1sBDTme9QDW5XVDetKQlfjzYZM98C3YyxktuE66/Bar9D7g894EhC4KDjFv1G0REWy0bUlBcYh3JBO37lSHXE5g6noh/LlCRgFcno51irCoH/8qq+tCI3avAzAPS9lPYEUwr0xNRUpu61qTyf9riggcp/xAn96YMH+icJgmv/Ctbf3mr7DgJlSwces6iog/vjSnut52jChp52ci+iwmyfo8WCfThMQYFkIZEPkdFbLX1JpdlvT2LgHcrKdVq2JtL/HvUb8Oma+T4DZYlJRMg2jTMJcstta4Ik2RSBhj2RtmuZ1Ktp6Ty+Bt/0JyLYiwx6uVRkBSdKCrOX1S5Y9y06vbVz92WU15tuuF8cR9aPT7ND/HKe9jYtND7T0Z1pSj7ZKRGi+EGy7LZHZ1Pc/35AV5rcChEEpr0zVVDY7VyZctLCFksYVg3qkYvOKpp3pUlQS4HH28U2bvsFH2vghk18LMvBjqutPIhsSLDyYUTOdJWKW1LL5SgfifI3mqqSjc06HygDw3WClmMD49fnaAkLXlhN4bW/sQ2TffDVgCfoGdh7j4Cvfs2pXo=
+  - RUST_BACKTRACE=1
