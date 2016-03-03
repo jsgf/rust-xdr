@@ -2,8 +2,8 @@
 name = "xdrgen"
 version = "0.2.0"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
-license = "MIT"
-description = "XDR codec generator from specification and runtime library"
+license = "MIT/Apache-2.0"
+description = "XDR codec generator from specification. Designed for use with xdr-codec."
 repository = "https://github.com/jsgf/rust-xdrgen"
 documentation = "https://jsgf.github.io/rust-xdr/doc/xdrgen/index.html"
 readme = "README.md"
