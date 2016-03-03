@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/jsgf/rust-xdr.svg?branch=master)](https://travis-ci.org/jsgf/rust-xdr)
 [![Crates.io](https://img.shields.io/crates/v/xdr-codec.svg)]()
+[![Coverage Status](https://coveralls.io/repos/github/jsgf/rust-xdr/badge.svg?branch=master)](https://coveralls.io/github/jsgf/rust-xdr?branch=master)
 
 This crate provides a set of runtime routines to encode and decode
 basic XDR types, which can be used with
