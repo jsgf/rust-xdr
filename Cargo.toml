@@ -1,0 +1,17 @@
+# Workspace root according to https://github.com/alexcrichton/rfcs/blob/cargo-workspace/text/0000-cargo-workspace.md
+[package]
+name = "rust-xdr"
+version = "0.0.0"
+workspace-root = true
+workspace = [ "xdr-codec", "xdrgen" ]
+
+[features]
+unstable = [ "xdrgen" ]
+
+[dependencies]
+xdr-codec = { path = "xdr-codec" }
+xdrgen = { path = "xdrgen", optional=true }
+
+[lib]
+name = "null"
+src = "src/null.rs"
