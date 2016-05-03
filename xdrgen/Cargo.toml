@@ -1,6 +1,6 @@
 [package]
 name = "xdrgen"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT/Apache-2.0"
 description = "XDR codec generator from specification. Designed for use with xdr-codec."
@@ -22,7 +22,7 @@ unstable = []
 [dependencies]
 log = "0.3"
 env_logger = "0.3"
-nom = "~1.1.0"
+nom = "~1.2"
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"
