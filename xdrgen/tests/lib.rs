@@ -177,7 +177,7 @@ fn enums() {
     let spec = r#"
         enum Foo {
             A = 0,
-            B = -1,
+            B = -1
         };
         struct Bar { Foo x; };
     "#;
@@ -193,7 +193,7 @@ fn unions() {
     let spec = r#"
         enum Foo {
             A = 0,
-            B = -1,
+            B = -1
         };
         union foo switch (Foo bar) {
         case A: int val;
