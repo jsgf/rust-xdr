@@ -47,7 +47,7 @@ fn short_unpack<T>(v: T) -> bool
 
     let mut data = Cursor::new(data);
     match T::unpack(&mut data) {
-        Err(Error::Byteorder(_)) => true,
+        Err(Error::IOError(_)) => true,
         _ => false,
     }
 }

@@ -13,7 +13,7 @@ keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 unstable = []
 
 [dependencies]
-byteorder = "0.4.2"
+byteorder = "0.5"
 
 [dev-dependencies]
 quickcheck = "0.2"
