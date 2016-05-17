@@ -32,8 +32,6 @@ pub type Result<T> = result::Result<T, Error>;
 /// This simply amalgamates the various errors which can arise.
 #[derive(Debug)]
 pub enum Error {
-    /// Byte order packing problem - generally a premature EOF.
-    Byteorder(byteorder::Error),
     /// An underlying IO error.
     IOError(io::Error),
     /// An improperly encoded String.
@@ -65,13 +63,6 @@ impl Error {
         Error::InvalidUtf8(err)
     }
 
-    pub fn byteorder(berr: byteorder::Error) -> Error {
-        match berr {
-            byteorder::Error::Io(ioe) => Error::IOError(ioe),
-            _ => Error::Byteorder(berr),
-        }
-    }
-
     pub fn generic<T>(err: T) -> Error
         where T: Display + error::Error
     {
@@ -95,22 +86,12 @@ impl From<string::FromUtf8Error> for Error {
     fn from(err: string::FromUtf8Error) -> Self { Error::InvalidUtf8(err) }
 }
 
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Self {
-        match err {
-            byteorder::Error::Io(ioe) => Error::IOError(ioe),
-            _ => Error::Byteorder(err),
-        }
-    }
-}
-
 unsafe impl Send for Error {}
 unsafe impl Sync for Error {}
 
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            &Error::Byteorder(ref be) => be.description(),
             &Error::IOError(ref ioe) => ioe.description(),
             &Error::InvalidUtf8(ref se) => se.description(),
             &Error::Generic(ref s) => s,
@@ -122,7 +103,6 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match self {
-            &Error::Byteorder(ref be) => Some(be),
             &Error::IOError(ref ioe) => Some(ioe),
             &Error::InvalidUtf8(ref se) => Some(se),
             _ => None

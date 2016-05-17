@@ -14,7 +14,6 @@
 //! is using record marking; both ends must agree.
 use std::io::{self, Read, BufRead, Write};
 use std::cmp::min;
-use byteorder;
 
 use super::{unpack, pack, Error};
 
@@ -61,7 +60,7 @@ impl<R: BufRead> XdrRecordReader<R> {
         let rechdr: u32 =
             match unpack(&mut self.reader) {
                 Ok(v) => v,
-                Err(Error::Byteorder(byteorder::Error::UnexpectedEOF)) => return Ok(true),
+                Err(Error::IOError(ref err)) if err.kind() == io::ErrorKind::UnexpectedEof => return Ok(true),
                 Err(e) => return Err(mapioerr(e)),
             };
 
