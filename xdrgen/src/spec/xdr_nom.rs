@@ -597,7 +597,7 @@ fn test_typedef() {
     assert_eq!(type_def(&b"typedef unsigned int foo;"[..]),
                Done(&b""[..], Defn::Typesyn(String::from("foo"), Type::UInt)));
     assert_eq!(type_def(&b"typedef int foo<>;"[..]),
-               Done(&b""[..], Defn::Typesyn(String::from("foo"), Type::Flex(Box::new(Type::Int), None))));
+               Done(&b""[..], Defn::Typespec(String::from("foo"), Type::Flex(Box::new(Type::Int), None))));
 
     assert_eq!(type_def(&b"enum foo { a };"[..]),
                Done(&b""[..], Defn::Typespec(String::from("foo"),

@@ -222,7 +222,7 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Opaque | &String | &Array(_, _) | &Flex(_, _) | &Option(_) |
+            &Opaque | &String | &Option(_) |
             &Ident(_) | &Int | &UInt | &Hyper | &UHyper | &Float | &Double |
             &Quadruple | &Bool
                 => true,
@@ -376,14 +376,16 @@ impl Decl {
     }
 }
 
+// Specification of a named type
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Typespec(pub String, pub Type);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Const(pub String, pub i64);
-
+// Named synonym for a type
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Typesyn(pub String, pub Type);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Const(pub String, pub i64);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Defn {
@@ -560,6 +562,11 @@ impl Emit for Typespec {
                             pub enum $name { $cases }).unwrap()
             },
 
+            &Flex(..) | &Array(..) => {
+                let tok = try!(ty.as_token(symtab, ctxt));
+                quote_item!(ctxt, pub struct $name(pub $tok);).unwrap()
+            },
+
             _ => {
                 let tok = try!(ty.as_token(symtab, ctxt));
                 quote_item!(ctxt, pub type $name = $tok;).unwrap()
@@ -632,8 +639,9 @@ impl Emitpack for Typespec {
                 quote_tokens!(ctxt, match self { $matches })
             },
 
-            &Flex(box Opaque, _) =>
-                quote_tokens!(ctxt, try!(xdr_codec::Opaque::borrowed(self).pack(out))),
+            // Array and Flex types are wrapped in tuple structs
+            &Flex(..) | &Array(..) =>
+                try!(ty.packer(quote_tokens!(ctxt, self.0), symtab, ctxt)),
 
             &Ident(_) => return Ok(None),
 
@@ -760,7 +768,12 @@ impl Emitpack for Typespec {
                 quote_tokens!(ctxt, match { let (v, dsz): (i32, _) = $selunpack; sz += dsz; v } { $matches })
             },
 
-            &Flex(_, _) | &Array(_, _) | &Option(_) => ty.unpacker(symtab, ctxt),
+            &Option(_) => ty.unpacker(symtab, ctxt),
+
+            &Flex(_, _) | &Array(_, _) => {
+                let unpk = ty.unpacker(symtab, ctxt);
+                quote_tokens!(ctxt, { let (v, usz) = $unpk; sz = usz; $name(v) })
+            },
 
             &Ident(_) => return Ok(None),
 
