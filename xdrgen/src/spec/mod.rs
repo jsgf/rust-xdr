@@ -564,7 +564,8 @@ impl Emit for Typespec {
 
             &Flex(..) | &Array(..) => {
                 let tok = try!(ty.as_token(symtab, ctxt));
-                quote_item!(ctxt, pub struct $name(pub $tok);).unwrap()
+                quote_item!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)]
+                                  pub struct $name(pub $tok);).unwrap()
             },
 
             _ => {
