@@ -21,7 +21,7 @@ pub type Result<T> = result::Result<T, Error>;
 
 pub use self::xdr_nom::specification;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Value {
     Ident(String),
     Const(i64),
@@ -55,7 +55,7 @@ impl Value {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Type {
     UInt,
     Int,
@@ -130,40 +130,47 @@ impl Type {
         }
     }
 
-    fn is_copyable(&self, symtab: &Symtab) -> bool {
+    fn is_copyable(&self, symtab: &Symtab, memo: Option<&mut BTreeMap<Type, bool>>) -> bool {
         use self::Type::*;
         use self::Decl::*;
+        let mut memoset = BTreeMap::new();
 
-        let declcopy = |d| {
-            match d {
-                &Void => true,
-                &Named(_, ref ty) => ty.is_copyable(symtab),
-            }
+        let mut memo = match memo {
+            None => &mut memoset,
+            Some(m) => m,
         };
 
-        match self {
+        // Check to see if we have a memoized result
+        if let Some(copyable) = memo.get(self) { return *copyable }
+
+        memo.insert(self.clone(), false);   // Not copyable unless we are
+
+        let copyable = match self {
             &Array(box Opaque, _) | &Array(box String, _) => true,
-            &Array(box ref ty, _) => ty.is_copyable(symtab),
+            &Array(box ref ty, _) => ty.is_copyable(symtab, Some(memo)),
             &Flex(..) => false,
             &Enum(_) => true,
 
-            &Option(ref ty) => ty.is_copyable(symtab),
+            &Option(ref ty) => ty.is_copyable(symtab, Some(memo)),
 
             &Struct(ref fields) =>
-                fields.iter().all(|f| declcopy(f)),
+                fields.iter().all(|f| f.is_copyable(symtab, memo)),
 
             &Union(_, ref cases, ref defl) =>
-                cases.iter().map(|c| &c.1).all(|d| declcopy(d)) &&
-                defl.as_ref().map_or(true, |d| declcopy(&*d)),
+                cases.iter().map(|c| &c.1).all(|d| d.is_copyable(symtab, memo)) &&
+                defl.as_ref().map_or(true, |d| d.is_copyable(symtab, memo)),
 
             &Ident(ref id) =>
                 match symtab.typespec(id) {
                     None => false,  // unknown, really
-                    Some(ref ty) => ty.is_copyable(symtab),
+                    Some(ref ty) => ty.is_copyable(symtab, Some(memo)),
                 },
 
             _ => self.is_prim(symtab),
-        }
+        };
+
+        memo.insert(self.clone(), copyable);
+        copyable
     }
 
     fn packer(&self, val: Vec<rustast::TokenTree>, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
@@ -339,13 +346,13 @@ impl Type {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct EnumDefn(pub String, pub Option<Value>);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct UnionCase(Value, Decl);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Decl {
     Void,
     Named(String, Type),
@@ -374,20 +381,28 @@ impl Decl {
             }
         }
     }
+
+    fn is_copyable(&self, symtab: &Symtab, memo: &mut BTreeMap<Type, bool>) -> bool {
+        use self::Decl::*;
+        match self {
+            &Void => true,
+            &Named(_, ref ty) => ty.is_copyable(symtab, Some(memo)),
+        }
+    }
 }
 
 // Specification of a named type
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct Typespec(pub String, pub Type);
 
 // Named synonym for a type
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct Typesyn(pub String, pub Type);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct Const(pub String, pub i64);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Defn {
     Typespec(String, Type),
     Typesyn(String, Type),
@@ -454,7 +469,7 @@ impl Emit for Typespec {
                         .map(|res| res.map(|(field, ty)|
                                            quote_tokens!(ctxt, pub $field: $ty,)))));
 
-                let derive = if ty.is_copyable(symtab) {
+                let derive = if ty.is_copyable(symtab, None) {
                     quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone, Copy)])
                 } else {
                     quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)])
@@ -552,7 +567,7 @@ impl Emit for Typespec {
                     }
                 }
 
-                let derive = if ty.is_copyable(symtab) {
+                let derive = if ty.is_copyable(symtab, None) {
                     quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone, Copy)])
                 } else {
                     quote_tokens!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)])
