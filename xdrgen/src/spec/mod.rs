@@ -869,16 +869,16 @@ impl Symtab {
         }
     }
 
-    fn defconst(&mut self, name: &String, val: i64, scope: Option<String>) {
-        self.consts.insert(name.clone(), (val, scope));
+    fn defconst<S: AsRef<str>>(&mut self, name: S, val: i64, scope: Option<String>) {
+        self.consts.insert(From::from(name.as_ref()), (val, scope));
     }
 
-    fn deftype(&mut self, name: &String, ty: &Type) {
-        self.typespecs.insert(name.clone(), ty.clone());
+    fn deftype<S: AsRef<str>>(&mut self, name: S, ty: &Type) {
+        self.typespecs.insert(From::from(name.as_ref()), ty.clone());
     }
 
-    fn deftypesyn(&mut self, name: &String, ty: &Type) {
-        self.typesyns.insert(name.clone(), ty.clone());
+    pub fn deftypesyn<S: AsRef<str>>(&mut self, name: S, ty: &Type) {
+        self.typesyns.insert(From::from(name.as_ref()), ty.clone());
     }
 
     pub fn getconst(&self, name: &String) -> Option<(i64, Option<String>)> {

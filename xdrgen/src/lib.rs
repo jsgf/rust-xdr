@@ -92,10 +92,17 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
     try!(input.read_to_string(&mut source));
 
-    let xdr = match spec::specification(&source) {
+    let mut xdr = match spec::specification(&source) {
         Ok(defns) => Symtab::new(&defns),
         Err(e) => return Err(xdr::Error::from(format!("parse error: {}", e))),
     };
+
+    // add "typedef int long" if the .x file didn't have another definition for long
+    if !xdr.typespecs().chain(xdr.typesyns()).any(|(k, _)| k == "long") {
+        xdr.deftypesyn("long", &spec::Type::Int)
+    }
+
+    let xdr = xdr;
 
     let res: Result<Vec<_>> = with_fake_extctxt(|e| {
         let consts = xdr.constants()

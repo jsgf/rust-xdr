@@ -199,6 +199,7 @@ kw!(kw_enum, b"enum");
 kw!(kw_float, b"float");
 kw!(kw_hyper, b"hyper");
 kw!(kw_int, b"int");
+kw!(kw_long, b"long");          // special case - part time keyword
 kw!(kw_opaque, b"opaque");
 kw!(kw_quadruple, b"quadruple");
 kw!(kw_string, b"string");
@@ -495,8 +496,9 @@ fn test_decls() {
 named!(type_spec<Type>,
        preceded!(spaces,
                  alt!(chain!(kw_unsigned ~ kw_int, || Type::UInt) |
+                      chain!(kw_unsigned ~ kw_long, || Type::UInt) |        // backwards compat with rpcgen
                       chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
-                      kw_unsigned => { |_| Type::UInt } |
+                      kw_unsigned => { |_| Type::UInt } |                   // backwards compat with rpcgen
                       kw_int => { |_| Type::Int } |
                       kw_hyper => { |_| Type::Hyper } |
                       kw_float => { |_| Type::Float } |
@@ -505,7 +507,7 @@ named!(type_spec<Type>,
                       kw_bool => { |_| Type::Bool } |
                       enum_type_spec => { |defns| Type::Enum(defns) } |
                       struct_type_spec => { |defns| Type::Struct(defns) } |
-                      chain!(kw_struct ~ id:ident, || Type::Ident(id)) |
+                      chain!(kw_struct ~ id:ident, || Type::Ident(id)) |    // backwards compat with rpcgen
                       union_type_spec => { |u| Type::union(u) } |
                       ident => { |id| Type::Ident(id) }
                       )
