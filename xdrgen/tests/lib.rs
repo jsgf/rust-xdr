@@ -75,6 +75,17 @@ typedef opaque buf3<>;
 }
 
 #[test]
+fn recursive_type() {
+    let name = "recursive_type";
+    let spec = r#"
+struct list { list *next; };
+"#;
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
+
+#[test]
 fn union_with_default() {
     let name = "union_with_default";
     let spec = r#"
