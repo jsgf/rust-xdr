@@ -499,6 +499,7 @@ named!(type_spec<Type>,
                       chain!(kw_unsigned ~ kw_long, || Type::UInt) |        // backwards compat with rpcgen
                       chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
                       kw_unsigned => { |_| Type::UInt } |                   // backwards compat with rpcgen
+                      kw_long => { |_| Type::Int } |                        // backward compat with rpcgen
                       kw_int => { |_| Type::Int } |
                       kw_hyper => { |_| Type::Hyper } |
                       kw_float => { |_| Type::Float } |
