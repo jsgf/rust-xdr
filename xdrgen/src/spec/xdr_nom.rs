@@ -192,6 +192,7 @@ macro_rules! kw {
 
 kw!(kw_bool, b"bool");
 kw!(kw_case, b"case");
+kw!(kw_char, b"char");          // special case - part time keyword
 kw!(kw_const, b"const");
 kw!(kw_default, b"default");
 kw!(kw_double, b"double");
@@ -497,9 +498,11 @@ named!(type_spec<Type>,
        preceded!(spaces,
                  alt!(chain!(kw_unsigned ~ kw_int, || Type::UInt) |
                       chain!(kw_unsigned ~ kw_long, || Type::UInt) |        // backwards compat with rpcgen
+                      chain!(kw_unsigned ~ kw_char, || Type::ident("u8")) | // backwards compat with rpcgen
                       chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
                       kw_unsigned => { |_| Type::UInt } |                   // backwards compat with rpcgen
-                      kw_long => { |_| Type::Int } |                        // backward compat with rpcgen
+                      kw_long => { |_| Type::Int } |                        // backwards compat with rpcgen
+                      kw_char => { |_| Type::ident("i8") } |                // backwards compat with rpcgen
                       kw_int => { |_| Type::Int } |
                       kw_hyper => { |_| Type::Hyper } |
                       kw_float => { |_| Type::Float } |

@@ -100,6 +100,10 @@ impl Type {
         Type::Union(Box::new(d), c, dfl.map(Box::new))
     }
 
+    fn ident<S: AsRef<str>>(id: S) -> Type {
+        Type::Ident(id.as_ref().to_string())
+    }
+
     fn is_boxed(&self, symtab: &Symtab) -> bool {
         use self::Type::*;
 
