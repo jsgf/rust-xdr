@@ -8,6 +8,7 @@ repository = "https://github.com/jsgf/rust-xdrgen"
 documentation = "https://jsgf.github.io/rust-xdr/doc/xdrgen/index.html"
 readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
+include = [ "src/**/*.rs", "tests/**/*.rs", "*.md", "Cargo.toml"  ]
 
 [[bin]]
 name = "xdrgen"
