@@ -36,7 +36,7 @@ fn test_spec() {
                Done(&b""[..], vec!()));
 
     assert_eq!(spec(&b"#include <foo>\ntypedef int foo;"[..]),
-               Done(&b""[..], vec!(Defn::Typesyn(String::from("foo"), Type::Int))));
+               Done(&b""[..], vec!(Defn::typesyn("foo", Type::Int))));
 
     assert_eq!(spec(&br#"
 /* test file */
@@ -52,12 +52,12 @@ struct bar {
 enum bop { a = 2, b = 1 };
 "#[..]),
                Done(&b""[..],
-                    vec!(Defn::Const(String::from("mip"), 123),
-                         Defn::Typesyn(String::from("foo"), Type::Int),
-                         Defn::Typespec(String::from("bar"), Type::Struct(vec!(Decl::Named(String::from("a"), Type::Int),
-                                                                               Decl::Named(String::from("b"), Type::Int)))),
-                         Defn::Typespec(String::from("bop"), Type::Enum(vec!(EnumDefn(String::from("a"), Some(Value::Const(2))),
-                                                                             EnumDefn(String::from("b"), Some(Value::Const(1)))))))));
+                    vec!(Defn::constant("mip", 123),
+                         Defn::typesyn("foo", Type::Int),
+                         Defn::typespec("bar", Type::Struct(vec!(Decl::named("a", Type::Int),
+                                                                               Decl::named("b", Type::Int)))),
+                         Defn::typespec("bop", Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(2))),
+                                                                             EnumDefn::new("b", Some(Value::Const(1)))))))));
 }
 
 named!(definition<Defn>,
@@ -279,13 +279,13 @@ fn test_kw() {
 
 }
 
-fn ident(input: &[u8]) -> IResult<&[u8], String> {
+fn ident(input: &[u8]) -> IResult<&[u8], &str> {
     // Grab an identifier and make sure it isn't a keyword
     match token(input) {
         Done(rest, val) => {
             match keyword(input) {
                 Done(..) => Error(Err::Position(ErrorKind::Custom(1), val)),
-                Error(..) | Incomplete(..) => Done(rest, String::from(str::from_utf8(val).unwrap())),
+                Error(..) | Incomplete(..) => Done(rest, str::from_utf8(val).unwrap()),
             }
         },
         Error(e) => Error(e),
@@ -295,8 +295,8 @@ fn ident(input: &[u8]) -> IResult<&[u8], String> {
 
 #[test]
 fn test_ident() {
-    assert_eq!(ident(&b"foo "[..]), Done(&b" "[..], String::from("foo")));
-    assert_eq!(ident(&b" foo "[..]), Done(&b" "[..], String::from("foo")));
+    assert_eq!(ident(&b"foo "[..]), Done(&b" "[..], "foo"));
+    assert_eq!(ident(&b" foo "[..]), Done(&b" "[..], "foo"));
     assert_eq!(ident(&b" bool "[..]), Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..])));
 }
 
@@ -395,11 +395,11 @@ named!(enum_body< Vec<EnumDefn> >,
               || { b }));
 
 named!(enum_assign<EnumDefn>,
-       chain!(id: ident ~ v: preceded!(eq, value)?, || { EnumDefn(String::from(id), v) }));
+       chain!(id: ident ~ v: preceded!(eq, value)?, || { EnumDefn::new(id, v) }));
 
 named!(value<Value>,
        alt!(number => { |c| Value::Const(c) } |
-            ident => { |id| Value::Ident(String::from(id)) }
+            ident => { |id| Value::ident(id) }
             )
        );
 
@@ -438,15 +438,15 @@ named!(declaration<Decl>,
 
 named!(nonvoid_declaration<Decl>,
        alt!(chain!(ty: array_type_spec ~ id: ident ~ lbrack ~ sz:value ~ rbrack,
-                   || Decl::Named(id, Type::Array(Box::new(ty), sz))) |
+                   || Decl::named(id, Type::Array(Box::new(ty), sz))) |
             chain!(ty: array_type_spec ~ id: ident ~ lt ~ sz:value? ~ gt,
-                   || Decl::Named(id, Type::Flex(Box::new(ty), sz))) |
+                   || Decl::named(id, Type::Flex(Box::new(ty), sz))) |
 
             chain!(ty: type_spec ~ star ~ id: ident,
-                   || Decl::Named(id, Type::Option(Box::new(ty)))) |
+                   || Decl::named(id, Type::Option(Box::new(ty)))) |
 
             chain!(ty: type_spec ~ id: ident,
-                   || Decl::Named(String::from(id), ty))
+                   || Decl::named(id, ty))
             )
        );
 
@@ -461,36 +461,36 @@ named!(array_type_spec<Type>,
 fn test_decls() {
     assert_eq!(declaration(&b"void "[..]), Done(&b" "[..], Decl::Void));
 
-    assert_eq!(declaration(&b"int foo;"[..]), Done(&b";"[..], Decl::Named(String::from("foo"), Type::Int)));
+    assert_eq!(declaration(&b"int foo;"[..]), Done(&b";"[..], Decl::named("foo", Type::Int)));
     assert_eq!(declaration(&b"int foo[123] "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Array(Box::new(Type::Int), Value::Const(123)))));
 
     assert_eq!(declaration(&b"int foo<123> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::Int), Some(Value::Const(123))))));
     assert_eq!(declaration(&b"int foo<> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::Int), None))));
     assert_eq!(declaration(&b"int *foo "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Option(Box::new(Type::Int)))));
 
     assert_eq!(declaration(&b"opaque foo[123] "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Array(Box::new(Type::Opaque), Value::Const(123)))));
     assert_eq!(declaration(&b"opaque foo<123> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::Opaque), Some(Value::Const(123))))));
     assert_eq!(declaration(&b"opaque foo<> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::Opaque), None))));
 
     assert_eq!(declaration(&b"string foo<123> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::String), Some(Value::Const(123))))));
     assert_eq!(declaration(&b"string foo<> "[..]),
-               Done(&b" "[..], Decl::Named(String::from("foo"),
+               Done(&b" "[..], Decl::named("foo",
                                            Type::Flex(Box::new(Type::String), None))));
 }
 
@@ -511,9 +511,9 @@ named!(type_spec<Type>,
                       kw_bool => { |_| Type::Bool } |
                       enum_type_spec => { |defns| Type::Enum(defns) } |
                       struct_type_spec => { |defns| Type::Struct(defns) } |
-                      chain!(kw_struct ~ id:ident, || Type::Ident(id)) |    // backwards compat with rpcgen
+                      chain!(kw_struct ~ id:ident, || Type::ident(id)) |    // backwards compat with rpcgen
                       union_type_spec => { |u| Type::union(u) } |
-                      ident => { |id| Type::Ident(id) }
+                      ident => { |id| Type::ident(id) }
                       )
                  )
        );
@@ -535,14 +535,14 @@ fn test_type() {
 
     assert_eq!(type_spec(&b"struct { int a; int b; } "[..]),
                Done(&b" "[..],
-                    Type::Struct(vec!(Decl::Named(String::from("a"), Type::Int),
-                                      Decl::Named(String::from("b"), Type::Int)))));
+                    Type::Struct(vec!(Decl::named("a", Type::Int),
+                                      Decl::named("b", Type::Int)))));
 
     assert_eq!(type_spec(&b"union switch (int a) { case 1: void; case 2: int a; default: void; } "[..]),
                          Done(&b" "[..],
-                              Type::Union(Box::new(Decl::Named(String::from("a"), Type::Int)),
+                              Type::Union(Box::new(Decl::named("a", Type::Int)),
                                           vec!(UnionCase(Value::Const(1), Decl::Void),
-                                               UnionCase(Value::Const(2), Decl::Named(String::from("a"), Type::Int))),
+                                               UnionCase(Value::Const(2), Decl::named("a", Type::Int))),
                                           Some(Box::new(Decl::Void)))));
 }
 
@@ -550,32 +550,32 @@ fn test_type() {
 fn test_enum() {
     assert_eq!(type_spec(&b"enum { a, b, c } "[..]),
                Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn(String::from("a"), None),
-                                    EnumDefn(String::from("b"), None),
-                                    EnumDefn(String::from("c"), None)))));
+                    Type::Enum(vec!(EnumDefn::new("a", None),
+                                    EnumDefn::new("b", None),
+                                    EnumDefn::new("c", None)))));
 
     assert_eq!(type_spec(&b"enum { a = 1, b, c } "[..]),
                Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn(String::from("a"), Some(Value::Const(1))),
-                                    EnumDefn(String::from("b"), None),
-                                    EnumDefn(String::from("c"), None)))));
+                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(1))),
+                                    EnumDefn::new("b", None),
+                                    EnumDefn::new("c", None)))));
 
     assert_eq!(type_spec(&b"enum { a = Bar, b, c } "[..]),
                Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn(String::from("a"), Some(Value::Ident(String::from("Bar")))),
-                                    EnumDefn(String::from("b"), None),
-                                    EnumDefn(String::from("c"), None)))));
+                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::ident("Bar"))),
+                                    EnumDefn::new("b", None),
+                                    EnumDefn::new("c", None)))));
 
     assert_eq!(type_spec(&b"enum { } "[..]),
                Error(Err::Position(ErrorKind::Alt, &b"enum { } "[..])));
 }
 
 named!(const_def<Defn>,
-       chain!(kw_const ~ id:ident ~ eq ~ v:number ~ semi, || Defn::Const(id, v)));
+       chain!(kw_const ~ id:ident ~ eq ~ v:number ~ semi, || Defn::constant(id, v)));
 
 #[test]
 fn test_const() {
-    assert_eq!(const_def(&b"const foo = 123;"[..]), Done(&b""[..], Defn::Const(String::from("foo"), 123)));
+    assert_eq!(const_def(&b"const foo = 123;"[..]), Done(&b""[..], Defn::constant("foo", 123)));
 }
 
 named!(type_def<Defn>,
@@ -592,32 +592,30 @@ named!(type_def<Defn>,
                            Decl::Void => panic!("void non-void declaration?"),
                        }
                    }) |
-            chain!(kw_enum ~ id:ident ~ e:enum_body ~ semi,     || Defn::Typespec(id, Type::Enum(e))) |
-            chain!(kw_struct ~ id:ident ~ s:struct_body ~ semi, || Defn::Typespec(id, Type::Struct(s))) |
-            chain!(kw_union ~ id:ident ~ u:union_body ~ semi,   || Defn::Typespec(id, Type::union(u)))
+            chain!(kw_enum ~ id:ident ~ e:enum_body ~ semi,     || Defn::typespec(id, Type::Enum(e))) |
+            chain!(kw_struct ~ id:ident ~ s:struct_body ~ semi, || Defn::typespec(id, Type::Struct(s))) |
+            chain!(kw_union ~ id:ident ~ u:union_body ~ semi,   || Defn::typespec(id, Type::union(u)))
             )
-       );
+    );
 
 #[test]
 fn test_typedef() {
     assert_eq!(type_def(&b"typedef int foo;"[..]),
-               Done(&b""[..], Defn::Typesyn(String::from("foo"), Type::Int)));
+               Done(&b""[..], Defn::typesyn("foo", Type::Int)));
     assert_eq!(type_def(&b"typedef unsigned int foo;"[..]),
-               Done(&b""[..], Defn::Typesyn(String::from("foo"), Type::UInt)));
+               Done(&b""[..], Defn::typesyn("foo", Type::UInt)));
     assert_eq!(type_def(&b"typedef int foo<>;"[..]),
-               Done(&b""[..], Defn::Typespec(String::from("foo"), Type::Flex(Box::new(Type::Int), None))));
+               Done(&b""[..], Defn::typespec("foo", Type::Flex(Box::new(Type::Int), None))));
 
     assert_eq!(type_def(&b"enum foo { a };"[..]),
-               Done(&b""[..], Defn::Typespec(String::from("foo"),
-                                             Type::Enum(vec!(EnumDefn(String::from("a"), None))))));
+               Done(&b""[..], Defn::typespec("foo", Type::Enum(vec!(EnumDefn::new("a", None))))));
 
     assert_eq!(type_def(&b"struct foo { int a; };"[..]),
-               Done(&b""[..], Defn::Typespec(String::from("foo"),
-                                             Type::Struct(vec!(Decl::Named(String::from("a"), Type::Int))))));
+               Done(&b""[..], Defn::typespec("foo", Type::Struct(vec!(Decl::named("a", Type::Int))))));
 
     assert_eq!(type_def(&b"union foo switch(int a) { case 1: int a; };"[..]),
-               Done(&b""[..], Defn::Typespec(String::from("foo"),
-                                             Type::Union(Box::new(Decl::Named(String::from("a"), Type::Int)),
-                                                         vec!(UnionCase(Value::Const(1), Decl::Named(String::from("a"), Type::Int))),
+               Done(&b""[..], Defn::typespec("foo",
+                                             Type::Union(Box::new(Decl::named("a", Type::Int)),
+                                                         vec!(UnionCase(Value::Const(1), Decl::named("a", Type::Int))),
                                                          None))));
 }

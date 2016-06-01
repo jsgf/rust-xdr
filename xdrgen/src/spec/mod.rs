@@ -28,6 +28,10 @@ pub enum Value {
 }
 
 impl Value {
+    fn ident<S: AsRef<str>>(id: S) -> Value {
+        Value::Ident(id.as_ref().to_string())
+    }
+
     fn as_ident(&self) -> rustast::Ident {
         match self {
             &Value::Ident(ref id) => rustast::str_to_ident(id),
@@ -353,6 +357,12 @@ impl Type {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct EnumDefn(pub String, pub Option<Value>);
 
+impl EnumDefn {
+    fn new<S: AsRef<str>>(id: S, val: Option<Value>) -> EnumDefn {
+        EnumDefn(id.as_ref().to_string(), val)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub struct UnionCase(Value, Decl);
 
@@ -363,6 +373,10 @@ pub enum Decl {
 }
 
 impl Decl {
+    fn named<S: AsRef<str>>(id: S, ty: Type) -> Decl {
+        Decl::Named(id.as_ref().to_string(), ty)
+    }
+
     fn name_as_ident(&self) -> Option<(rustast::Ident, &Type)> {
         use self::Decl::*;
         match self {
@@ -411,6 +425,20 @@ pub enum Defn {
     Typespec(String, Type),
     Typesyn(String, Type),
     Const(String, i64),
+}
+
+impl Defn {
+    fn typespec<S: AsRef<str>>(id: S, ty: Type) -> Defn {
+        Defn::Typespec(id.as_ref().to_string(), ty)
+    }
+
+    fn typesyn<S: AsRef<str>>(id: S, ty: Type) -> Defn {
+        Defn::Typesyn(id.as_ref().to_string(), ty)
+    }
+
+    fn constant<S: AsRef<str>>(id: S, v: i64) -> Defn {
+        Defn::Const(id.as_ref().to_string(), v)
+    }
 }
 
 pub trait Emit {
