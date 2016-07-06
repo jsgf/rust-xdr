@@ -25,15 +25,15 @@ fn main() {
     let mut err = stderr();
 
     match &args[1..] {
-        [ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
-        [ref fname] => {
+        &[ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
+        &[ref fname] => {
             match generate(fname.as_os_str().to_str().unwrap_or("<unknown>"),
                            BufReader::new(File::open(fname).unwrap()), output) {
                 Ok(()) => (),
                 Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },
             }
         },
-        [] => {
+        &[] => {
             match generate("stdin", BufReader::new(stdin()), output) {
                 Ok(()) => (),
                 Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },

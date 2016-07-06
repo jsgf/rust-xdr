@@ -7,7 +7,8 @@
 //! encoding/decoding primitive types, strings, opaque data and arrays.
 #![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
 #![crate_type = "lib"]
-extern crate syntax;
+#[macro_use] extern crate syntax;
+extern crate rustc_errors as errors;
 extern crate xdr_codec as xdr;
 
 #[macro_use]
