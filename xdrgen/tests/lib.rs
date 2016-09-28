@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::io::{Cursor, Write};
 use std::process::Command;
 
-use xdrgen::{generate, compile};
+use xdrgen::generate;
 use xdr_codec::{Result, Error};
 
 fn build_test(name: &str, xdr_spec: &str) -> Result<()> {
