@@ -7,7 +7,7 @@ pub fn with_fake_extctxt<T, F: Fn(&ExtCtxt) -> T>(f: F) -> T {
   let ps = syntax::parse::ParseSess::new();
   let mut loader = DummyResolver;
 
-  let mut cx = syntax::ext::base::ExtCtxt::new(&ps, Vec::new(),
+  let mut cx = syntax::ext::base::ExtCtxt::new(&ps,
     syntax::ext::expand::ExpansionConfig::default("rust-peg".to_string()),
     &mut loader,
   );
@@ -15,7 +15,7 @@ pub fn with_fake_extctxt<T, F: Fn(&ExtCtxt) -> T>(f: F) -> T {
   cx.bt_push(syntax::codemap::ExpnInfo{
     call_site: DUMMY_SP,
     callee: syntax::codemap::NameAndSpan {
-      format: syntax::codemap::MacroBang(syntax::parse::token::intern("")),
+      format: syntax::codemap::MacroBang(syntax::symbol::Symbol::intern("")),
       span: None,
       allow_internal_unstable: false,
     }

@@ -34,8 +34,8 @@ impl Value {
 
     fn as_ident(&self) -> rustast::Ident {
         match self {
-            &Value::Ident(ref id) => rustast::str_to_ident(id),
-            &Value::Const(val) => rustast::str_to_ident(&format!("Const{}{}",
+            &Value::Ident(ref id) => rustast::Ident::from_str(id),
+            &Value::Const(val) => rustast::Ident::from_str(&format!("Const{}{}",
                                                                  (if val < 0 { "_" } else { "" }),
                                                                  val.abs())),
         }
@@ -47,9 +47,9 @@ impl Value {
         match self {
             &Value::Const(c) => quote_tokens!(ctxt, $c),
             &Value::Ident(ref id) => {
-                let tok = rustast::str_to_ident(id);
+                let tok = rustast::Ident::from_str(id);
                 if let Some((_, Some(ref scope))) = symtab.getconst(id) {
-                    let scope = rustast::str_to_ident(scope);
+                    let scope = rustast::Ident::from_str(scope);
                     quote_tokens!(ctxt, $scope :: $tok)
                 } else {
                     quote_tokens!(ctxt, $tok)
@@ -344,7 +344,7 @@ impl Type {
             },
 
             &Ident(ref name) => {
-                let id = rustast::str_to_ident(name);
+                let id = rustast::Ident::from_str(name);
                 quote_tokens!(ctxt, $id)
             },
 
@@ -381,7 +381,7 @@ impl Decl {
         use self::Decl::*;
         match self {
             &Void => None,
-            &Named(ref name, ref ty) => Some((rustast::str_to_ident(name), ty)),
+            &Named(ref name, ref ty) => Some((rustast::Ident::from_str(name), ty)),
         }
     }
 
@@ -395,7 +395,7 @@ impl Decl {
                 if false && ty.is_boxed(symtab) {
                     tok = quote_tokens!(ctxt, Box<$tok>)
                 };
-                Ok(Some((rustast::str_to_ident(name), tok)))
+                Ok(Some((rustast::Ident::from_str(name), tok)))
             }
         }
     }
@@ -452,7 +452,7 @@ pub trait Emitpack : Emit {
 
 impl Emit for Const {
     fn define(&self, _: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<rustast::P<rustast::Item>> {
-        let name = rustast::str_to_ident(&self.0);
+        let name = rustast::Ident::from_str(&self.0);
         let val = &self.1;
 
         Ok(quote_item!(ctxt, pub const $name: i64 = $val;).unwrap())
@@ -463,7 +463,7 @@ impl Emit for Typesyn {
     fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
               -> Result<rustast::P<rustast::Item>> {
         let ty = &self.1;
-        let name = rustast::str_to_ident(&self.0);
+        let name = rustast::Ident::from_str(&self.0);
         let tok = try!(ty.as_token(symtab, ctxt));
         Ok(quote_item!(ctxt, pub type $name = $tok;).unwrap())
     }
@@ -473,7 +473,7 @@ impl Emit for Typespec {
     fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<rustast::P<rustast::Item>> {
         use self::Type::*;
 
-        let name = rustast::str_to_ident(&self.0);
+        let name = rustast::Ident::from_str(&self.0);
         let ty = &self.1;
 
         let ret = match ty {
@@ -481,7 +481,7 @@ impl Emit for Typespec {
                 let defs: Vec<_> = edefs.iter()
                     .filter_map(|&EnumDefn(ref field, _)| {
                         if let Some((val, Some(_))) = symtab.getconst(field) {
-                            Some((rustast::str_to_ident(&field), val as isize))
+                            Some((rustast::Ident::from_str(&field), val as isize))
                         } else {
                             None
                         }
@@ -570,7 +570,7 @@ impl Emit for Typespec {
                                         tok = quote_tokens!(ctxt, Box<$tok>)
                                     };
                                     if labelfields {
-                                        let name = rustast::str_to_ident(name);
+                                        let name = rustast::Ident::from_str(name);
                                         Ok(quote_tokens!(ctxt, $label { $name : $tok },))
                                     } else {
                                         Ok(quote_tokens!(ctxt, $label($tok),))
@@ -587,7 +587,7 @@ impl Emit for Typespec {
                                 tok = quote_tokens!(ctxt, Box<$tok>)
                             };
                             if labelfields {
-                                let name = rustast::str_to_ident(name);
+                                let name = rustast::Ident::from_str(name);
                                 cases.push(quote_tokens!(ctxt, default { $name: $tok },))
                             } else {
                                 cases.push(quote_tokens!(ctxt, default($tok),))
@@ -629,7 +629,7 @@ impl Emitpack for Typespec {
         use self::Type::*;
         use self::Decl::*;
 
-        let name = rustast::str_to_ident(&self.0);
+        let name = rustast::Ident::from_str(&self.0);
         let ty = &self.1;
         let mut directive = Vec::new();
 
@@ -643,7 +643,7 @@ impl Emitpack for Typespec {
                 let decls: Vec<_> = decl.iter()
                     .filter_map(|d| match d {
                         &Void => None,
-                        &Named(ref name, ref ty) => Some((rustast::str_to_ident(name), ty)),
+                        &Named(ref name, ref ty) => Some((rustast::Ident::from_str(name), ty)),
                     })
                     .map(|(field, ty)| {
                         let p = ty.packer(quote_tokens!(ctxt, self.$field), symtab, ctxt).unwrap();
@@ -717,7 +717,7 @@ impl Emitpack for Typespec {
         use self::Type::*;
         use self::Decl::*;
 
-        let name = rustast::str_to_ident(&self.0);
+        let name = rustast::Ident::from_str(&self.0);
         let ty = &self.1;
         let mut directive = Vec::new();
 
@@ -726,11 +726,11 @@ impl Emitpack for Typespec {
                 directive = quote_tokens!(ctxt, #[inline]);
                 let matchdefs: Vec<_> = defs.iter()
                     .filter_map(|&EnumDefn(ref name, _)| {
-                        let tok = rustast::str_to_ident(name);
+                        let tok = rustast::Ident::from_str(name);
                         if let Some((ref _val, ref scope)) = symtab.getconst(name) {
                             //let val = *val as i32;
                             if let &Some(ref scope) = scope {
-                                let scope = rustast::str_to_ident(scope);
+                                let scope = rustast::Ident::from_str(scope);
                                 //Some(quote_tokens!(ctxt, $val => $scope :: $tok,))
                                 Some(quote_tokens!(ctxt, x if x == $scope :: $tok as i32 => $scope :: $tok,))
                             } else {
