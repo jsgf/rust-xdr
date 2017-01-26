@@ -23,7 +23,7 @@ unstable = []
 [dependencies]
 log = "0.3"
 env_logger = "0.3"
-nom = "~1.2"
+nom = "1.*"
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"
