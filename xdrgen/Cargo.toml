@@ -28,3 +28,6 @@ nom = "1.*"
 [dependencies.xdr-codec]
 path = "../xdr-codec"
 version = "0.2"
+
+[dev-dependencies]
+tempdir = "*"

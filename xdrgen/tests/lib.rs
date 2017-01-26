@@ -1,9 +1,8 @@
 extern crate xdrgen;
 extern crate xdr_codec;
+extern crate tempdir;
 
-use std::env;
 use std::fs::{create_dir_all, File};
-use std::path::PathBuf;
 use std::io::{Cursor, Write};
 use std::process::Command;
 
@@ -11,13 +10,15 @@ use xdrgen::generate;
 use xdr_codec::{Result, Error};
 
 fn build_test(name: &str, xdr_spec: &str) -> Result<()> {
-    let dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let tempdir = tempdir::TempDir::new("build").expect("Failed to make tempdir");
+    let dir = tempdir.path();
 
+    println!("tempdir {:?}", dir);
     let _ = create_dir_all(&dir);
 
-    let mainfile = dir.with_file_name(format!("{}.rs", name));
-    let testfile = dir.with_file_name(format!("{}_xdr.rs", name));
-    let exefile = dir.with_file_name(format!("{}", name));
+    let mainfile = dir.join(format!("{}.rs", name));
+    let testfile = dir.join(format!("{}_xdr.rs", name));
+    let exefile = dir.join(format!("{}", name));
 
     let template = format!(r#"
 extern crate xdr_codec;
@@ -42,12 +43,20 @@ fn main() {{}}
         try!(generate(name, Cursor::new(xdr_spec.as_bytes()), test));
     }
 
-    let compile = try!(Command::new("rustc")
-                       .arg("-L").arg(dir.with_file_name("../../deps"))
-                       .arg("-o").arg(exefile)
-                       .arg("-Z").arg("no-trans")
-                       .arg(mainfile)
-                       .output());
+    let compile = {
+	    let mut cmd = Command::new("rustc");
+	    let cmd = cmd
+               .current_dir(std::env::current_dir()?)
+               .arg("--crate-type").arg("bin")
+               .arg("--crate-name").arg(name)
+		       .arg("-L").arg("./target/debug/deps")
+		       .arg("--extern").arg("xdr_codec=target/debug/deps/libxdr_codec.rlib")
+		       .arg("-o").arg(exefile)
+		       //.arg("-Z").arg("no-trans")
+		       .arg(mainfile);
+	    println!("CWD: {:?} Command: {:?}", std::env::current_dir(), cmd);
+	    cmd.output()?
+	};
 
     println!("stdout: {}\n, stderr: {}",
              String::from_utf8_lossy(&compile.stdout),
