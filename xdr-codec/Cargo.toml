@@ -14,7 +14,7 @@ include = [ "src/**/*.rs", "tests/**/*.rs", "*.md", "Cargo.toml"  ]
 unstable = []
 
 [dependencies]
-byteorder = "0.5"
+byteorder = "1"
 
 [dev-dependencies]
 quickcheck = "0.2"
