@@ -45,12 +45,12 @@ fn main() {{}}
 
     let compile = {
 	    let mut cmd = Command::new("rustc");
-	    let cmd = cmd
+        let cmd = cmd
                .current_dir(std::env::current_dir()?)
                .arg("--crate-type").arg("bin")
                .arg("--crate-name").arg(name)
-		       .arg("-L").arg("./target/debug/deps")
-		       .arg("--extern").arg("xdr_codec=target/debug/deps/libxdr_codec.rlib")
+		       .arg("-L").arg("../target/debug/deps")
+		       .arg("--extern").arg("xdr_codec=../target/debug/libxdr_codec.rlib")
 		       .arg("-o").arg(exefile)
 		       //.arg("-Z").arg("no-trans")
 		       .arg(mainfile);
