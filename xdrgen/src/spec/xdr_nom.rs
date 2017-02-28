@@ -20,7 +20,9 @@ pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
     match spec(input.as_bytes()) {
         Done(_, spec) => Ok(spec),
         Error(Err::Position(kind, input)) => {
-            Err(format!("{:?}: {}", kind, String::from(str::from_utf8(input).unwrap())))
+            Err(format!("{:?}: {}",
+                        kind,
+                        String::from(str::from_utf8(input).unwrap())))
         }
         Error(err) => Err(format!("Error: {:?}", err)),
         Incomplete(need) => Err(format!("Incomplete {:?}", need)),
@@ -443,12 +445,12 @@ named!(declaration<Decl>,
 
 named!(nonvoid_declaration<Decl>,
        alt!(chain!(ty: array_type_spec ~ id: ident ~ lbrack ~ sz:value ~ rbrack,
-                   || Decl::named(id, Type::Array(Box::new(ty), sz))) |
+                   || Decl::named(id, Type::array(ty, sz))) |
             chain!(ty: array_type_spec ~ id: ident ~ lt ~ sz:value? ~ gt,
-                   || Decl::named(id, Type::Flex(Box::new(ty), sz))) |
+                   || Decl::named(id, Type::flex(ty, sz))) |
 
             chain!(ty: type_spec ~ star ~ id: ident,
-                   || Decl::named(id, Type::Option(Box::new(ty)))) |
+                   || Decl::named(id, Type::option(ty))) |
 
             chain!(ty: type_spec ~ id: ident,
                    || Decl::named(id, ty))
@@ -589,9 +591,9 @@ named!(type_def<Defn>,
                        match decl.clone() {
                            Decl::Named(name, ty) => {
                                if ty.is_syn() {
-                                   Defn::Typesyn(name, ty)
+                                   Defn::typesyn(name, ty)
                                } else {
-                                   Defn::Typespec(name, ty)
+                                   Defn::typespec(name, ty)
                                }
                            },
                            Decl::Void => panic!("void non-void declaration?"),

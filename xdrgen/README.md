@@ -38,7 +38,7 @@ mod simple {
 ```
 
 Once you have this, you can call `mytype.pack(&mut output)`, and
-`let mything: MyThing = try!(xdr_codec::unpack(&mut input))`.
+`let mything: MyThing = xdr_codec::unpack(&mut input)?;`.
 
 The serializers require your types to implement the `Pack` and `Unpack`
 traits, and generate code to write to `std::io::Write` implementation, and

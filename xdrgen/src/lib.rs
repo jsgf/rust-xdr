@@ -5,13 +5,11 @@
 //!
 //! It is intended to be used with the "xdr-codec" crate, which provides the runtime library for
 //! encoding/decoding primitive types, strings, opaque data and arrays.
-#![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
-#![crate_type = "lib"]
-#[macro_use]
-pub extern crate syntax;
-extern crate syntax_pos;
-extern crate rustc_errors as errors;
+
 extern crate xdr_codec as xdr;
+
+#[macro_use]
+extern crate quote;
 
 #[macro_use]
 extern crate log;
@@ -24,45 +22,12 @@ use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
 use std::fmt::Display;
 use std::env;
-use std::iter::FromIterator;
-use std::fmt::Debug;
 use std::result;
 
 use xdr::Result;
 
 mod spec;
 use spec::{Symtab, Emit, Emitpack};
-use spec::{with_fake_extctxt, rustast};
-
-// Given an iterator returning results, return a result containing
-// either the first error or a an Ok collection.
-fn fold_result<I, T, E, C>(it: I) -> result::Result<C, E>
-    where I: IntoIterator<Item = result::Result<T, E>>,
-          C: FromIterator<T>,
-          E: Debug
-{
-    let (good, bad): (_, Vec<_>) = it.into_iter().partition(|res| res.is_ok());
-
-    let badness = bad.into_iter().fold(None, |cur, res| match cur {
-        None => Some(res),
-        Some(v) => Some(v),
-    });
-
-    match badness {
-        Some(Err(b)) => Err(b),
-        Some(Ok(_)) => panic!("Ok on the bad list"),
-        None => Ok(good.into_iter().map(|r| r.unwrap()).collect()),
-    }
-}
-
-// fn option_result<T, E>(optres: Option<result::Result<T, E>>) -> result::Result<Option<T>, E> {
-// match optres {
-// None => Ok(None),
-// Some(Err(e)) => Err(e),
-// Some(Ok(v)) => Ok(Some(v)),
-// }
-// }
-//
 
 fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::Result<T, E>> {
     match resopt {
@@ -70,18 +35,6 @@ fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::R
         Ok(Some(v)) => Some(Ok(v)),
         Err(e) => Some(Err(e)),
     }
-}
-
-#[test]
-fn test_fold_result() {
-    let good = vec![Ok(1), Ok(2), Ok(3)];
-    assert_eq!(fold_result::<_,_,&str,_>(good), Ok(vec![1,2,3]));
-
-    let bad = vec![Ok(1), Ok(2), Err("bad")];
-    assert_eq!(fold_result::<_,_,_,Vec<u32>>(bad), Err("bad"));
-
-    let worse = vec![Ok(1), Err("worse"), Err("bad")];
-    assert_eq!(fold_result::<_,_,_,Vec<u32>>(worse), Err("worse"));
 }
 
 /// Generate Rust code from an RFC4506 XDR specification
@@ -94,7 +47,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 {
     let mut source = String::new();
 
-    try!(input.read_to_string(&mut source));
+    input.read_to_string(&mut source)?;
 
     let xdr = match spec::specification(&source) {
         Ok(defns) => Symtab::new(&defns),
@@ -103,7 +56,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
     let xdr = xdr;
 
-    let res: Result<Vec<_>> = with_fake_extctxt(|e| {
+    let res: Vec<_> = {
         let consts = xdr.constants()
             .filter_map(|(c, &(v, ref scope))| {
                 if scope.is_none() {
@@ -112,42 +65,44 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
                     None
                 }
             })
-            .map(|c| c.define(&xdr, e));
+            .map(|c| c.define(&xdr));
 
         let typespecs = xdr.typespecs()
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
-            .map(|c| c.define(&xdr, e));
+            .map(|c| c.define(&xdr));
 
         let typesyns = xdr.typesyns()
             .map(|(n, ty)| spec::Typesyn(n.clone(), ty.clone()))
-            .map(|c| c.define(&xdr, e));
+            .map(|c| c.define(&xdr));
 
         let packers = xdr.typespecs()
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
-            .filter_map(|c| result_option(c.pack(&xdr, e)));
+            .filter_map(|c| result_option(c.pack(&xdr)));
 
         let unpackers = xdr.typespecs()
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
-            .filter_map(|c| result_option(c.unpack(&xdr, e)));
+            .filter_map(|c| result_option(c.unpack(&xdr)));
 
-        let module: Vec<_> = try!(fold_result(consts.chain(typespecs).chain(typesyns).chain(packers).chain(unpackers)));
+        consts.chain(typespecs)
+            .chain(typesyns)
+            .chain(packers)
+            .chain(unpackers)
+            .collect::<Result<Vec<_>>>()?
+    };
 
-        Ok(module.iter().map(|it| rustast::item_to_string(it)).collect())
-    });
-
-    let res = try!(res);
-
-    let _ = writeln!(output, r#"
+    let _ = writeln!(output,
+                     r#"
 // GENERATED CODE
 //
 // Generated from {}.
 //
 // DO NOT EDIT
 
-"#, infile);
+"#,
+                     infile);
 
     for it in res {
-        let _ = writeln!(output, "{}\n", it);
+        let _ = writeln!(output, "{}\n", it.as_str());
     }
 
     Ok(())
@@ -180,7 +135,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 pub fn compile<P>(infile: P) -> Result<()>
     where P: AsRef<Path> + Display
 {
-    let input = try!(File::open(&infile));
+    let input = File::open(&infile)?;
 
     let mut outdir = PathBuf::from(env::var("OUT_DIR").unwrap_or(String::from(".")));
     let outfile = PathBuf::from(infile.as_ref())
@@ -193,7 +148,7 @@ pub fn compile<P>(infile: P) -> Result<()>
 
     outdir.push(&format!("{}_xdr.rs", outfile));
 
-    let output = try!(File::create(outdir));
+    let output = File::create(outdir)?;
 
     generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"),
              input,

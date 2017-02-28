@@ -1,49 +1,34 @@
-#![feature(slice_patterns, plugin, quote, box_patterns)]
 #![crate_type = "bin"]
 
 extern crate xdrgen;
 extern crate env_logger;
+extern crate clap;
 
-use std::env;
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::io::{stdin, stdout, stderr};
 
-use xdrgen::generate;
+use clap::App;
 
-fn print_usage(prog: &str) {
-    let mut err = stderr();
-    let _ = writeln!(&mut err, "Usage: {} [file]", prog);
-}
+use xdrgen::generate;
 
 fn main() {
     let _ = env_logger::init();
 
-    let args: Vec<_> = env::args_os().collect();
-    let progname = args[0].to_str().unwrap();
+    let matches = App::new("XDR code generator")
+        .arg_from_usage("[FILE] 'Set .x file'")
+        .get_matches();
+
     let output = stdout();
     let mut err = stderr();
 
-    match &args[1..] {
-        &[ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
-        &[ref fname] => {
-            match generate(fname.as_os_str().to_str().unwrap_or("<unknown>"),
-                           BufReader::new(File::open(fname).unwrap()),
-                           output) {
-                Ok(()) => (),
-                Err(e) => {
-                    let _ = writeln!(&mut err, "Failed: {}", e);
-                }
-            }
-        }
-        &[] => {
-            match generate("stdin", BufReader::new(stdin()), output) {
-                Ok(()) => (),
-                Err(e) => {
-                    let _ = writeln!(&mut err, "Failed: {}", e);
-                }
-            }
-        }
-        _ => return print_usage(progname),
+    let res = if let Some(fname) = matches.value_of("FILE") {
+        generate(fname, BufReader::new(File::open(fname).unwrap()), output)
+    } else {
+        generate("stdin", BufReader::new(stdin()), output)
     };
+
+    if let Err(e) = res {
+        let _ = writeln!(&mut err, "Failed: {}", e);
+    }
 }

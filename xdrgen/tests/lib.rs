@@ -34,13 +34,13 @@ fn main() {{}}
                            testfile.as_os_str().to_string_lossy());
 
     {
-        let mut main = try!(File::create(&mainfile));
-        try!(main.write_all(template.as_bytes()));
+        let mut main = File::create(&mainfile)?;
+        main.write_all(template.as_bytes())?;
     }
 
     {
-        let test = try!(File::create(&testfile));
-        try!(generate(name, Cursor::new(xdr_spec.as_bytes()), test));
+        let test = File::create(&testfile)?;
+        generate(name, Cursor::new(xdr_spec.as_bytes()), test)?;
     }
 
     let compile = {
