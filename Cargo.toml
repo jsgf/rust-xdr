@@ -1,9 +1,2 @@
 [workspace]
-members = [ "xdr-codec", "xdrgen" ]
-
-#[features]
-#unstable = [ "xdrgen" ]
-
-#[dependencies]
-#xdr-codec = { path = "xdr-codec" }
-#xdrgen = { path = "xdrgen", optional=true }
+members = [ "xdr-codec", "xdrgen", "xdrgen/example" ]
