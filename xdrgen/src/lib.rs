@@ -12,6 +12,9 @@ extern crate xdr_codec as xdr;
 extern crate quote;
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 extern crate log;
 
 #[macro_use]

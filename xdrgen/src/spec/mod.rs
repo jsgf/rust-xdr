@@ -1,4 +1,5 @@
 use std::collections::btree_map::{BTreeMap, Iter};
+use std::collections::HashSet;
 use std::io::{stderr, Write};
 
 use std::result;
@@ -15,6 +16,36 @@ pub use self::xdr_nom::specification;
 
 use super::result_option;
 
+lazy_static! {
+    static ref KEYWORDS: HashSet<&'static str> = {
+        let kws = [
+            "abstract",	"alignof", "as", "become", "box",
+            "break", "const", "continue", "crate", "do",
+            "else", "enum", "extern", "false", "final",
+            "fn", "for", "if", "impl", "in",
+            "let", "loop", "macro", "match", "mod",
+            "move", "mut", "offsetof", "override", "priv",
+            "proc", "pub", "pure", "ref", "return",
+            "Self", "self", "sizeof", "static", "struct",
+            "super", "trait", "true", "type", "typeof",
+            "unsafe", "unsized", "use", "virtual", "where",
+            "while", "yield",
+        ];
+
+        kws.into_iter().map(|x| *x).collect()
+    };
+}
+
+fn quote_ident<S: AsRef<str>>(id: S) -> quote::Ident {
+    let id = id.as_ref();
+
+    if (*KEYWORDS).contains(id) {
+        quote::Ident::new(format!("{}_", id))
+    } else {
+        quote::Ident::new(id)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Value {
     Ident(String),
@@ -28,7 +59,7 @@ impl Value {
 
     fn as_ident(&self) -> quote::Ident {
         match self {
-            &Value::Ident(ref id) => quote::Ident::new(id.as_ref()),
+            &Value::Ident(ref id) => quote_ident(id),
             &Value::Const(val) => {
                 quote::Ident::new(format!("Const{}{}",
                                                 (if val < 0 { "_" } else { "" }),
@@ -45,9 +76,9 @@ impl Value {
         match self {
             &Value::Const(c) => quote!(#c),
             &Value::Ident(ref id) => {
-                let tok = quote::Ident::new(id.as_ref());
+                let tok = quote_ident(id.as_str());
                 if let Some((_, Some(ref scope))) = symtab.getconst(id) {
-                    let scope = quote::Ident::new(scope.as_ref());
+                    let scope = quote_ident(scope);
                     quote!(#scope :: #tok)
                 } else {
                     quote!(#tok)
@@ -342,7 +373,7 @@ impl Type {
             }
 
             &Ident(ref name) => {
-                let id = quote::Ident::new(name.as_ref());
+                let id = quote_ident(name.as_str());
                 quote!(#id)
             }
 
@@ -379,7 +410,7 @@ impl Decl {
         use self::Decl::*;
         match self {
             &Void => None,
-            &Named(ref name, ref ty) => Some((quote::Ident::new(name.as_ref()), ty)),
+            &Named(ref name, ref ty) => Some((quote_ident(name), ty)),
         }
     }
 
@@ -388,11 +419,12 @@ impl Decl {
         match self {
             &Void => Ok(None),
             &Named(ref name, ref ty) => {
+                let nametok = quote_ident(name.as_str());
                 let mut tok = ty.as_token(symtab)?;
                 if false && ty.is_boxed(symtab) {
                     tok = quote!(Box<#tok>)
                 };
-                Ok(Some((quote::Ident::new(name.as_ref()), tok)))
+                Ok(Some((nametok, tok)))
             }
         }
     }
@@ -449,7 +481,7 @@ pub trait Emitpack: Emit {
 
 impl Emit for Const {
     fn define(&self, _: &Symtab) -> Result<Tokens> {
-        let name = quote::Ident::new(self.0.as_ref());
+        let name = quote_ident(&self.0);
         let val = &self.1;
 
         Ok(quote!(pub const #name: i64 = #val;))
@@ -459,7 +491,7 @@ impl Emit for Const {
 impl Emit for Typesyn {
     fn define(&self, symtab: &Symtab) -> Result<Tokens> {
         let ty = &self.1;
-        let name = quote::Ident::new(self.0.as_ref());
+        let name = quote_ident(&self.0);
         let tok = ty.as_token(symtab)?;
         Ok(quote!(pub type #name = #tok;))
     }
@@ -469,7 +501,7 @@ impl Emit for Typespec {
     fn define(&self, symtab: &Symtab) -> Result<Tokens> {
         use self::Type::*;
 
-        let name = quote::Ident::new(self.0.as_ref());
+        let name = quote_ident(&self.0);
         let ty = &self.1;
 
         let ret = match ty {
@@ -477,7 +509,7 @@ impl Emit for Typespec {
                 let defs: Vec<_> = edefs.iter()
                     .filter_map(|&EnumDefn(ref field, _)| {
                         if let Some((val, Some(_))) = symtab.getconst(field) {
-                            Some((quote::Ident::new(field.as_ref()), val as isize))
+                            Some((quote_ident(field), val as isize))
                         } else {
                             None
                         }
@@ -568,7 +600,7 @@ impl Emit for Typespec {
                                         tok = quote!(Box<#tok>)
                                     };
                                     if labelfields {
-                                        let name = quote::Ident::new(name.as_ref());
+                                        let name = quote_ident(name);
                                         Ok(quote!(#label { #name : #tok },))
                                     } else {
                                         Ok(quote!(#label(#tok),))
@@ -587,7 +619,7 @@ impl Emit for Typespec {
                                 tok = quote!(Box<#tok>)
                             };
                             if labelfields {
-                                let name = quote::Ident::new(name.as_ref());
+                                let name = quote_ident(name);
                                 cases.push(quote!(default { #name: #tok },))
                             } else {
                                 cases.push(quote!(default(#tok),))
@@ -630,7 +662,7 @@ impl Emitpack for Typespec {
         use self::Type::*;
         use self::Decl::*;
 
-        let name = quote::Ident::new(self.0.as_ref());
+        let name = quote_ident(&self.0);
         let ty = &self.1;
         let mut directive = quote!();
 
@@ -644,7 +676,7 @@ impl Emitpack for Typespec {
                 let decls: Vec<_> = decl.iter()
                     .filter_map(|d| match d {
                         &Void => None,
-                        &Named(ref name, ref ty) => Some((quote::Ident::new(name.as_ref()), ty)),
+                        &Named(ref name, ref ty) => Some((quote_ident(name), ty)),
                     })
                     .map(|(field, ty)| {
                         let p = ty.packer(quote!(self.#field), symtab).unwrap();
@@ -718,7 +750,7 @@ impl Emitpack for Typespec {
         use self::Type::*;
         use self::Decl::*;
 
-        let name = quote::Ident::new(self.0.as_ref());
+        let name = quote_ident(&self.0);
         let ty = &self.1;
         let mut directive = quote!();
 
@@ -727,11 +759,11 @@ impl Emitpack for Typespec {
                 directive = quote!(#[inline]);
                 let matchdefs: Vec<_> = defs.iter()
                     .filter_map(|&EnumDefn(ref name, _)| {
-                        let tok = quote::Ident::new(name.as_ref());
+                        let tok = quote_ident(name);
                         if let Some((ref _val, ref scope)) = symtab.getconst(name) {
                             // let val = *val as i32;
                             if let &Some(ref scope) = scope {
-                                let scope = quote::Ident::new(scope.as_ref());
+                                let scope = quote_ident(scope);
                                 // Some(quote!(#val => #scope :: #tok,))
                                 Some(quote!(x if x == #scope :: #tok as i32 => #scope :: #tok,))
                             } else {

@@ -180,7 +180,7 @@ fn rfc4506() {
           */
          struct file {
             string filename<MAXNAMELEN>; /* name of file    */
-            filetype type_;              /* info about file */
+            filetype type;               /* info about file */
             string owner<MAXUSERNAME>;   /* owner of file   */
             opaque data<MAXFILELEN>;     /* file data       */
          };

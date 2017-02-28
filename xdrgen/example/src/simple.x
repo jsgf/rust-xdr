@@ -10,4 +10,5 @@ struct Foo {
 	Bar *barish;
 	string name<>;
 	Things thing;
+	unsigned type;
 };
