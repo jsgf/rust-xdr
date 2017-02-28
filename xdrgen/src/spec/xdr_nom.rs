@@ -7,7 +7,9 @@ use std::str;
 use super::{Value, Type, Decl, Defn, EnumDefn, UnionCase};
 
 #[inline]
-fn ignore<T>(_: T) -> () { () }
+fn ignore<T>(_: T) -> () {
+    ()
+}
 
 // Complete tag
 fn ctag<T: AsBytes>(input: &[u8], tag: T) -> IResult<&[u8], &[u8]> {
@@ -17,8 +19,9 @@ fn ctag<T: AsBytes>(input: &[u8], tag: T) -> IResult<&[u8], &[u8]> {
 pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
     match spec(input.as_bytes()) {
         Done(_, spec) => Ok(spec),
-        Error(Err::Position(kind, input)) =>
-            Err(format!("{:?}: {}", kind, String::from(str::from_utf8(input).unwrap()))),
+        Error(Err::Position(kind, input)) => {
+            Err(format!("{:?}: {}", kind, String::from(str::from_utf8(input).unwrap())))
+        }
         Error(err) => Err(format!("Error: {:?}", err)),
         Incomplete(need) => Err(format!("Incomplete {:?}", need)),
     }
@@ -82,9 +85,9 @@ fn digit<F: Fn(u8) -> bool>(input: &[u8], isdigit: F) -> IResult<&[u8], &[u8]> {
     for (idx, item) in input.iter().enumerate() {
         if !isdigit(*item) {
             if idx == 0 {
-                return Error(Err::Position(ErrorKind::Digit, input))
+                return Error(Err::Position(ErrorKind::Digit, input));
             } else {
-                return Done(&input[idx..], &input[0..idx])
+                return Done(&input[idx..], &input[0..idx]);
             }
         }
     }
@@ -156,11 +159,13 @@ fn token(input: &[u8]) -> IResult<&[u8], &[u8]> {
         match *item as char {
             'a'...'z' | 'A'...'Z' | '_' => continue,
             '0'...'9' if idx > 0 => continue,
-            _ => if idx > 0 {
-                return Done(&input[idx..], &input[0..idx])
-            } else {
-                return Error(Err::Position(ErrorKind::AlphaNumeric, input))
-            },
+            _ => {
+                if idx > 0 {
+                    return Done(&input[idx..], &input[0..idx]);
+                } else {
+                    return Error(Err::Position(ErrorKind::AlphaNumeric, input));
+                }
+            }
         }
     }
     Incomplete(Needed::Unknown)
@@ -272,7 +277,7 @@ fn test_kw() {
 
     for nk in &vec!("boo", "in", "inx", "booll") {
         match keyword((*nk).as_bytes()) {
-            e@Done(..) => panic!("{:?} => {:?}", nk, e),
+            e @ Done(..) => panic!("{:?} => {:?}", nk, e),
             e => println!("{:?} => {:?}", nk, e),
         }
     }
@@ -287,7 +292,7 @@ fn ident(input: &[u8]) -> IResult<&[u8], &str> {
                 Done(..) => Error(Err::Position(ErrorKind::Custom(1), val)),
                 Error(..) | Incomplete(..) => Done(rest, str::from_utf8(val).unwrap()),
             }
-        },
+        }
         Error(e) => Error(e),
         Incomplete(need) => Incomplete(need),
     }

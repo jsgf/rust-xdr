@@ -44,7 +44,7 @@ fn main() {{}}
     }
 
     let compile = {
-	    let mut cmd = Command::new("rustc");
+        let mut cmd = Command::new("rustc");
         let cmd = cmd
                .current_dir(std::env::current_dir()?)
                .arg("--crate-type").arg("bin")
@@ -54,9 +54,9 @@ fn main() {{}}
 		       .arg("-o").arg(exefile)
 		       //.arg("-Z").arg("no-trans")
 		       .arg(mainfile);
-	    println!("CWD: {:?} Command: {:?}", std::env::current_dir(), cmd);
-	    cmd.output()?
-	};
+        println!("CWD: {:?} Command: {:?}", std::env::current_dir(), cmd);
+        cmd.output()?
+    };
 
     println!("stdout: {}\n, stderr: {}",
              String::from_utf8_lossy(&compile.stdout),
@@ -131,10 +131,10 @@ default:
 #[test]
 fn simple() {
     let name = "simple";
-    let specs = vec!["struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper hyperfoo; };",
+    let specs = vec!["struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper \
+                      hyperfoo; };",
                      "const blop = 123;",
-                     "typedef opaque Ioaddr<>;"
-                     ];
+                     "typedef opaque Ioaddr<>;"];
 
     for (i, spec) in specs.into_iter().enumerate() {
         let name = format!("{}_{}", name, i);

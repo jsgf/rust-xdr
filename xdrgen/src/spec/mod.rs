@@ -35,13 +35,17 @@ impl Value {
     fn as_ident(&self) -> rustast::Ident {
         match self {
             &Value::Ident(ref id) => rustast::Ident::from_str(id),
-            &Value::Const(val) => rustast::Ident::from_str(&format!("Const{}{}",
-                                                                 (if val < 0 { "_" } else { "" }),
-                                                                 val.abs())),
+            &Value::Const(val) => {
+                rustast::Ident::from_str(&format!("Const{}{}",
+                                                  (if val < 0 { "_" } else { "" }),
+                                                  val.abs()))
+            }
         }
     }
 
-    fn as_i64(&self, symtab: &Symtab) -> Option<i64> { symtab.value(self) }
+    fn as_i64(&self, symtab: &Symtab) -> Option<i64> {
+        symtab.value(self)
+    }
 
     fn as_token(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Vec<rustast::TokenTree> {
         match self {
@@ -71,8 +75,8 @@ pub enum Type {
     Bool,
 
     // Special array elements
-    Opaque,                     // binary
-    String,                     // text
+    Opaque, // binary
+    String, // text
 
     // Compound types
     Enum(Vec<EnumDefn>),
@@ -114,7 +118,13 @@ impl Type {
         match self {
             _ if self.is_prim(symtab) => false,
             &Array(_, _) | &Flex(_, _) | &Option(_) => false,
-            &Ident(ref name) => if let Some(ty) = symtab.typespec(name) { ty.is_boxed(symtab) } else { true },
+            &Ident(ref name) => {
+                if let Some(ty) = symtab.typespec(name) {
+                    ty.is_boxed(symtab)
+                } else {
+                    true
+                }
+            }
             _ => true,
         }
     }
@@ -123,18 +133,16 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Int | &UInt |
-            &Hyper | &UHyper |
-            &Float | &Double | &Quadruple |
-            &Bool       => true,
+            &Int | &UInt | &Hyper | &UHyper | &Float | &Double | &Quadruple | &Bool => true,
 
-            &Ident(ref id) =>
+            &Ident(ref id) => {
                 match symtab.typespec(id) {
                     None => false,
                     Some(ref ty) => ty.is_prim(symtab),
-                },
+                }
+            }
 
-            _           => false,
+            _ => false,
         }
     }
 
@@ -149,30 +157,34 @@ impl Type {
         };
 
         // Check to see if we have a memoized result
-        if let Some(copyable) = memo.get(self) { return *copyable }
+        if let Some(copyable) = memo.get(self) {
+            return *copyable;
+        }
 
         memo.insert(self.clone(), false);   // Not copyable unless we are
 
         let copyable = match self {
-            &Array(box Opaque, _) | &Array(box String, _) => true,
+            &Array(box Opaque, _) |
+            &Array(box String, _) => true,
             &Array(box ref ty, _) => ty.is_copyable(symtab, Some(memo)),
             &Flex(..) => false,
             &Enum(_) => true,
 
             &Option(ref ty) => ty.is_copyable(symtab, Some(memo)),
 
-            &Struct(ref fields) =>
-                fields.iter().all(|f| f.is_copyable(symtab, memo)),
+            &Struct(ref fields) => fields.iter().all(|f| f.is_copyable(symtab, memo)),
 
-            &Union(_, ref cases, ref defl) =>
+            &Union(_, ref cases, ref defl) => {
                 cases.iter().map(|c| &c.1).all(|d| d.is_copyable(symtab, memo)) &&
-                defl.as_ref().map_or(true, |d| d.is_copyable(symtab, memo)),
+                defl.as_ref().map_or(true, |d| d.is_copyable(symtab, memo))
+            }
 
-            &Ident(ref id) =>
+            &Ident(ref id) => {
                 match symtab.typespec(id) {
                     None => false,  // unknown, really
                     Some(ref ty) => ty.is_copyable(symtab, Some(memo)),
-                },
+                }
+            }
 
             _ => self.is_prim(symtab),
         };
@@ -181,53 +193,57 @@ impl Type {
         copyable
     }
 
-    fn packer(&self, val: Vec<rustast::TokenTree>, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
+    fn packer(&self,
+              val: Vec<rustast::TokenTree>,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
               -> Result<Vec<rustast::TokenTree>> {
         use self::Type::*;
         use self::Decl::*;
 
-        let res = match self {
-            &Enum(_) => { quote_tokens!(ctxt, try!((*$val as i32).pack(out))) },
+        let res =
+            match self {
+                &Enum(_) => quote_tokens!(ctxt, try!((*$val as i32).pack(out))),
 
-            &Flex(box Opaque, ref maxsz) => {
-                let maxsz = match maxsz {
-                    &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => {
-                        let mx = mx.as_token(symtab, ctxt);
-                        quote_tokens!(ctxt, Some($mx as usize))
-                    },
-                };
-                quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_flex(&$val, $maxsz, out)))
-            },
+                &Flex(box Opaque, ref maxsz) => {
+                    let maxsz = match maxsz {
+                        &None => quote_tokens!(ctxt, None),
+                        &Some(ref mx) => {
+                            let mx = mx.as_token(symtab, ctxt);
+                            quote_tokens!(ctxt, Some($mx as usize))
+                        }
+                    };
+                    quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_flex(&$val, $maxsz, out)))
+                }
 
-            &Flex(box String, ref maxsz) => {
-                let maxsz = match maxsz {
-                    &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => {
-                        let mx = mx.as_token(symtab, ctxt);
-                        quote_tokens!(ctxt, Some($mx as usize))
-                    },
-                };
-                quote_tokens!(ctxt, try!(xdr_codec::pack_string(&$val, $maxsz, out)))
-            },
+                &Flex(box String, ref maxsz) => {
+                    let maxsz = match maxsz {
+                        &None => quote_tokens!(ctxt, None),
+                        &Some(ref mx) => {
+                            let mx = mx.as_token(symtab, ctxt);
+                            quote_tokens!(ctxt, Some($mx as usize))
+                        }
+                    };
+                    quote_tokens!(ctxt, try!(xdr_codec::pack_string(&$val, $maxsz, out)))
+                }
 
-            &Flex(_, ref maxsz) => {
-                let maxsz = match maxsz {
-                    &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => {
-                        let mx = mx.as_token(symtab, ctxt);
-                        quote_tokens!(ctxt, Some($mx as usize))
-                    },
-                };
-                quote_tokens!(ctxt, try!(xdr_codec::pack_flex(&$val, $maxsz, out)))
-            },
+                &Flex(_, ref maxsz) => {
+                    let maxsz = match maxsz {
+                        &None => quote_tokens!(ctxt, None),
+                        &Some(ref mx) => {
+                            let mx = mx.as_token(symtab, ctxt);
+                            quote_tokens!(ctxt, Some($mx as usize))
+                        }
+                    };
+                    quote_tokens!(ctxt, try!(xdr_codec::pack_flex(&$val, $maxsz, out)))
+                }
 
-            &Array(box Opaque, _) | &Array(box String, _) =>
+                &Array(box Opaque, _) | &Array(box String, _) =>
                 quote_tokens!(ctxt, try!(xdr_codec::pack_opaque_array(&$val[..], $val.len(), out))),
-            &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], $val.len(), out, None))),
+                &Array(_, _) => quote_tokens!(ctxt, try!(xdr_codec::pack_array(&$val[..], $val.len(), out, None))),
 
-            _ => quote_tokens!(ctxt, try!($val.pack(out))),
-        };
+                _ => quote_tokens!(ctxt, try!($val.pack(out))),
+            };
 
         trace!("packed {:?} val {:?} => {:?}", self, val, res);
         Ok(res)
@@ -237,10 +253,8 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Opaque | &String | &Option(_) |
-            &Ident(_) | &Int | &UInt | &Hyper | &UHyper | &Float | &Double |
-            &Quadruple | &Bool
-                => true,
+            &Opaque | &String | &Option(_) | &Ident(_) | &Int | &UInt | &Hyper | &UHyper |
+            &Float | &Double | &Quadruple | &Bool => true,
             _ => false,
         }
     }
@@ -249,7 +263,8 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Array(box Opaque, ref value) | &Array(box String, ref value) => {
+            &Array(box Opaque, ref value) |
+            &Array(box String, ref value) => {
                 let value = value.as_token(symtab, ctxt);
 
                 quote_tokens!(ctxt, {
@@ -258,7 +273,7 @@ impl Type {
                     let sz = try!(xdr_codec::unpack_opaque_array(input, &mut buf[..], $value as usize));
                     (buf, sz)
                 })
-            },
+            }
 
             &Array(ref ty, ref value) => {
                 let value = value.as_token(symtab, ctxt);
@@ -270,51 +285,63 @@ impl Type {
                     let sz = try!(xdr_codec::unpack_array(input, &mut buf[..], $value as usize, None));
                     (buf, sz)
                 })
-            },
+            }
 
             &Flex(box String, ref maxsz) => {
                 let maxsz = match maxsz {
                     &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    }
                 };
                 quote_tokens!(ctxt, try!(xdr_codec::unpack_string(input, $maxsz)))
-            },
+            }
 
             &Flex(box Opaque, ref maxsz) => {
                 let maxsz = match maxsz {
                     &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    }
                 };
                 quote_tokens!(ctxt, try!(xdr_codec::unpack_opaque_flex(input, $maxsz)))
-            },
+            }
 
             &Flex(_, ref maxsz) => {
                 let maxsz = match maxsz {
                     &None => quote_tokens!(ctxt, None),
-                    &Some(ref mx) => { let mx = mx.as_token(symtab, ctxt); quote_tokens!(ctxt, Some($mx as usize)) },
+                    &Some(ref mx) => {
+                        let mx = mx.as_token(symtab, ctxt);
+                        quote_tokens!(ctxt, Some($mx as usize))
+                    }
                 };
                 quote_tokens!(ctxt, try!(xdr_codec::unpack_flex(input, $maxsz)))
-            },
+            }
 
             _ => quote_tokens!(ctxt, try!(xdr_codec::Unpack::unpack(input))),
         }
     }
 
-    fn as_token(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Vec<rustast::TokenTree>> {
+    fn as_token(&self,
+                symtab: &Symtab,
+                ctxt: &rustast::ExtCtxt)
+                -> Result<Vec<rustast::TokenTree>> {
         use self::Type::*;
 
         let ret = match self {
-            &Int        => quote_tokens!(ctxt, i32),
-            &UInt       => quote_tokens!(ctxt, u32),
-            &Hyper      => quote_tokens!(ctxt, i64),
-            &UHyper     => quote_tokens!(ctxt, u64),
-            &Float      => quote_tokens!(ctxt, f32),
-            &Double     => quote_tokens!(ctxt, f64),
-            &Quadruple  => quote_tokens!(ctxt, f128),
-            &Bool       => quote_tokens!(ctxt, bool),
+            &Int => quote_tokens!(ctxt, i32),
+            &UInt => quote_tokens!(ctxt, u32),
+            &Hyper => quote_tokens!(ctxt, i64),
+            &UHyper => quote_tokens!(ctxt, u64),
+            &Float => quote_tokens!(ctxt, f32),
+            &Double => quote_tokens!(ctxt, f64),
+            &Quadruple => quote_tokens!(ctxt, f128),
+            &Bool => quote_tokens!(ctxt, bool),
 
-            &String     => quote_tokens!(ctxt, String),
-            &Opaque     => quote_tokens!(ctxt, Vec<u8>),
+            &String => quote_tokens!(ctxt, String),
+            &Opaque => quote_tokens!(ctxt, Vec<u8>),
 
             &Option(box ref ty) => {
                 let tok = try!(ty.as_token(symtab, ctxt));
@@ -323,30 +350,31 @@ impl Type {
                 } else {
                     quote_tokens!(ctxt, Option<$tok>)
                 }
-            },
+            }
 
-            &Array(box String, ref sz) | &Array(box Opaque, ref sz) => {
+            &Array(box String, ref sz) |
+            &Array(box Opaque, ref sz) => {
                 let sztok = sz.as_token(symtab, ctxt);
                 quote_tokens!(ctxt, [u8; $sztok as usize])
-            },
+            }
 
             &Array(box ref ty, ref sz) => {
                 let tytok = try!(ty.as_token(symtab, ctxt));
                 let sztok = sz.as_token(symtab, ctxt);
                 quote_tokens!(ctxt, [$tytok; $sztok as usize])
-            },
+            }
 
             &Flex(box String, _) => quote_tokens!(ctxt, String),
             &Flex(box Opaque, _) => quote_tokens!(ctxt, Vec<u8>),
             &Flex(box ref ty, _) => {
                 let tok = try!(ty.as_token(symtab, ctxt));
                 quote_tokens!(ctxt, Vec<$tok>)
-            },
+            }
 
             &Ident(ref name) => {
                 let id = rustast::Ident::from_str(name);
                 quote_tokens!(ctxt, $id)
-            },
+            }
 
             _ => return Err(Error::from(format!("can't have unnamed type {:?}", self))),
         };
@@ -385,7 +413,10 @@ impl Decl {
         }
     }
 
-    fn as_token(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<(rustast::Ident, Vec<rustast::TokenTree>)>> {
+    fn as_token(&self,
+                symtab: &Symtab,
+                ctxt: &rustast::ExtCtxt)
+                -> Result<Option<(rustast::Ident, Vec<rustast::TokenTree>)>> {
         use self::Decl::*;
         use self::Type::*;
         match self {
@@ -442,12 +473,21 @@ impl Defn {
 }
 
 pub trait Emit {
-    fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<rustast::P<rustast::Item>>;
+    fn define(&self,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
+              -> Result<rustast::P<rustast::Item>>;
 }
 
-pub trait Emitpack : Emit {
-    fn pack(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<rustast::P<rustast::Item>>>;
-    fn unpack(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<rustast::P<rustast::Item>>>;
+pub trait Emitpack: Emit {
+    fn pack(&self,
+            symtab: &Symtab,
+            ctxt: &rustast::ExtCtxt)
+            -> Result<Option<rustast::P<rustast::Item>>>;
+    fn unpack(&self,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
+              -> Result<Option<rustast::P<rustast::Item>>>;
 }
 
 impl Emit for Const {
@@ -460,7 +500,9 @@ impl Emit for Const {
 }
 
 impl Emit for Typesyn {
-    fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt)
+    fn define(&self,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
               -> Result<rustast::P<rustast::Item>> {
         let ty = &self.1;
         let name = rustast::Ident::from_str(&self.0);
@@ -470,7 +512,10 @@ impl Emit for Typesyn {
 }
 
 impl Emit for Typespec {
-    fn define(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<rustast::P<rustast::Item>> {
+    fn define(&self,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
+              -> Result<rustast::P<rustast::Item>> {
         use self::Type::*;
 
         let name = rustast::Ident::from_str(&self.0);
@@ -490,7 +535,7 @@ impl Emit for Typespec {
                     .collect();
 
                 quote_item!(ctxt, #[derive(Debug, Eq, PartialEq, Copy, Clone)] pub enum $name { $defs }).unwrap()
-            },
+            }
 
             &Struct(ref decls) => {
                 use self::Decl::*;
@@ -508,8 +553,9 @@ impl Emit for Typespec {
                 };
                 quote_item!(ctxt,
                             $derive
-                            pub struct $name { $decls }).unwrap()
-            },
+                            pub struct $name { $decls })
+                    .unwrap()
+            }
 
             &Union(box ref selector, ref cases, ref defl) => {
                 use self::Decl::*;
@@ -521,23 +567,25 @@ impl Emit for Typespec {
                 let compatcase = |case: &Value| {
                     let seltype = match selector {
                         &Void => return false,
-                        &Named(_, ref ty) => ty
+                        &Named(_, ref ty) => ty,
                     };
 
                     match case {
-                        &Const(val) if val < 0 =>
+                        &Const(val) if val < 0 => {
                             match seltype {
                                 &Int | &Hyper => true,
                                 _ => false,
-                            },
+                            }
+                        }
 
-                        &Const(_) =>
+                        &Const(_) => {
                             match seltype {
                                 &Int | &Hyper | &UInt | &UHyper => true,
                                 _ => false,
-                            },
+                            }
+                        }
 
-                        &Ident(ref id) =>
+                        &Ident(ref id) => {
                             if *seltype == Bool {
                                 id == "TRUE" || id == "FALSE"
                             } else {
@@ -549,7 +597,8 @@ impl Emit for Typespec {
                                 } else {
                                     false
                                 }
-                            },
+                            }
+                        }
                     }
                 };
 
@@ -592,10 +641,8 @@ impl Emit for Typespec {
                             } else {
                                 cases.push(quote_tokens!(ctxt, default($tok),))
                             }
-                        },
-                        box Void => {
-                            cases.push(quote_tokens!(ctxt, default,))
-                        },
+                        }
+                        box Void => cases.push(quote_tokens!(ctxt, default,)),
                     }
                 }
 
@@ -606,26 +653,31 @@ impl Emit for Typespec {
                 };
                 quote_item!(ctxt,
                             $derive
-                            pub enum $name { $cases }).unwrap()
-            },
+                            pub enum $name { $cases })
+                    .unwrap()
+            }
 
             &Flex(..) | &Array(..) => {
                 let tok = try!(ty.as_token(symtab, ctxt));
                 quote_item!(ctxt, #[derive(Debug, Eq, PartialEq, Clone)]
-                                  pub struct $name(pub $tok);).unwrap()
-            },
+                                  pub struct $name(pub $tok);)
+                    .unwrap()
+            }
 
             _ => {
                 let tok = try!(ty.as_token(symtab, ctxt));
                 quote_item!(ctxt, pub type $name = $tok;).unwrap()
-            },
+            }
         };
         Ok(ret)
     }
 }
 
 impl Emitpack for Typespec {
-    fn pack(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<rustast::P<rustast::Item>>> {
+    fn pack(&self,
+            symtab: &Symtab,
+            ctxt: &rustast::ExtCtxt)
+            -> Result<Option<rustast::P<rustast::Item>>> {
         use self::Type::*;
         use self::Decl::*;
 
@@ -637,7 +689,7 @@ impl Emitpack for Typespec {
             &Enum(_) => {
                 directive = quote_tokens!(ctxt, #[inline]);
                 try!(ty.packer(quote_tokens!(ctxt, self), symtab, ctxt))
-            },
+            }
 
             &Struct(ref decl) => {
                 let decls: Vec<_> = decl.iter()
@@ -651,7 +703,7 @@ impl Emitpack for Typespec {
                     })
                     .collect();
                 quote_tokens!(ctxt, $decls 0)
-            },
+            }
 
             &Union(_, ref cases, ref defl) => {
                 let mut matches: Vec<_> = cases.iter()
@@ -675,31 +727,29 @@ impl Emitpack for Typespec {
                     .collect();
 
                 if let &Some(box ref decl) = defl {
-                    let default =
-                        match decl {
-                            &Void => quote_tokens!(ctxt, &$name::default => return Err(xdr_codec::Error::invalidcase()),),
-                            &Named(_, _) => quote_tokens!(ctxt, &$name::default(_) => return Err(xdr_codec::Error::invalidcase()),),
-                        };
+                    let default = match decl {
+                        &Void => quote_tokens!(ctxt, &$name::default => return Err(xdr_codec::Error::invalidcase()),),
+                        &Named(_, _) => quote_tokens!(ctxt, &$name::default(_) => return Err(xdr_codec::Error::invalidcase()),),
+                    };
 
                     matches.push(default)
                 }
 
                 quote_tokens!(ctxt, match self { $matches })
-            },
+            }
 
             // Array and Flex types are wrapped in tuple structs
-            &Flex(..) | &Array(..) =>
-                try!(ty.packer(quote_tokens!(ctxt, self.0), symtab, ctxt)),
+            &Flex(..) | &Array(..) => try!(ty.packer(quote_tokens!(ctxt, self.0), symtab, ctxt)),
 
             &Ident(_) => return Ok(None),
 
             _ => {
                 if ty.is_prim(symtab) {
-                    return Ok(None)
+                    return Ok(None);
                 } else {
                     try!(ty.packer(quote_tokens!(ctxt, self), symtab, ctxt))
                 }
-            },
+            }
         };
 
         trace!("body {:?}", body);
@@ -713,7 +763,10 @@ impl Emitpack for Typespec {
                        }))
     }
 
-    fn unpack(&self, symtab: &Symtab, ctxt: &rustast::ExtCtxt) -> Result<Option<rustast::P<rustast::Item>>> {
+    fn unpack(&self,
+              symtab: &Symtab,
+              ctxt: &rustast::ExtCtxt)
+              -> Result<Option<rustast::P<rustast::Item>>> {
         use self::Type::*;
         use self::Decl::*;
 
@@ -752,7 +805,7 @@ impl Emitpack for Typespec {
                         _ => return Err(xdr_codec::Error::invalidenum())
                     }
                 })
-            },
+            }
 
             &Struct(ref decls) => {
                 let decls: Vec<_> = decls.iter()
@@ -765,7 +818,7 @@ impl Emitpack for Typespec {
                     .collect();
 
                 quote_tokens!(ctxt, $name { $decls })
-            },
+            }
 
             &Union(box ref sel, ref cases, ref defl) => {
                 let mut matches: Vec<_> = try!(fold_result(
@@ -799,12 +852,13 @@ impl Emitpack for Typespec {
                                 sz += csz;
                                 v
                             }))
-                        },
+                        }
                     };
 
                     matches.push(defl);
                 } else {
-                    let defl = quote_tokens!(ctxt, _ => return Err(xdr_codec::Error::invalidcase()));
+                    let defl =
+                        quote_tokens!(ctxt, _ => return Err(xdr_codec::Error::invalidcase()));
                     matches.push(defl);
                 }
 
@@ -814,19 +868,19 @@ impl Emitpack for Typespec {
                 };
 
                 quote_tokens!(ctxt, match { let (v, dsz): (i32, _) = $selunpack; sz += dsz; v } { $matches })
-            },
+            }
 
             &Option(_) => ty.unpacker(symtab, ctxt),
 
             &Flex(_, _) | &Array(_, _) => {
                 let unpk = ty.unpacker(symtab, ctxt);
                 quote_tokens!(ctxt, { let (v, usz) = $unpk; sz = usz; $name(v) })
-            },
+            }
 
             &Ident(_) => return Ok(None),
 
             _ if ty.is_prim(symtab) => return Ok(None),
-            _ => return Err(Error::from(format!("unimplemented ty={:?}", ty)))
+            _ => return Err(Error::from(format!("unimplemented ty={:?}", ty))),
         };
 
         Ok(quote_item!(ctxt,
@@ -866,15 +920,13 @@ impl Symtab {
                 &Defn::Typespec(ref name, ref ty) => {
                     self.deftype(name, ty);
                     self.update_enum_consts(name, ty);
-                },
+                }
 
-                &Defn::Const(ref name, val) => {
-                    self.defconst(name, val, None)
-                },
+                &Defn::Const(ref name, val) => self.defconst(name, val, None),
 
                 &Defn::Typesyn(ref name, ref ty) => {
                     self.deftypesyn(name, ty);
-                },
+                }
             }
         }
     }
@@ -887,15 +939,20 @@ impl Symtab {
             for &EnumDefn(ref name, ref maybeval) in edefn {
                 let v = match maybeval {
                     &None => prev + 1,
-                    &Some(ref val) => match self.value(val) {
-                        Some(c) => c,
-                        None => { let _ = writeln!(&mut err, "Unknown value {:?}", val); continue }
+                    &Some(ref val) => {
+                        match self.value(val) {
+                            Some(c) => c,
+                            None => {
+                                let _ = writeln!(&mut err, "Unknown value {:?}", val);
+                                continue;
+                            }
+                        }
                     }
                 };
 
                 prev = v;
 
-                //println!("enum {} -> {}", name, v);
+                // println!("enum {} -> {}", name, v);
                 self.defconst(name, v, Some(scope.clone()));
             }
         }
@@ -929,10 +986,12 @@ impl Symtab {
 
     pub fn typespec(&self, name: &String) -> Option<&Type> {
         match self.typespecs.get(name) {
-            None => match self.typesyns.get(name) {
-                None => None,
-                Some(ty) => Some(ty),
-            },
+            None => {
+                match self.typesyns.get(name) {
+                    None => None,
+                    Some(ty) => Some(ty),
+                }
+            }
             Some(ty) => Some(ty),
         }
     }

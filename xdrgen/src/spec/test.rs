@@ -8,8 +8,8 @@ fn typedef_void() {
 typedef void;           /* syntactically defined, semantically meaningless  */
 "#);
 
-        println!("spec {:?}", s);
-        assert!(s.is_err())
+    println!("spec {:?}", s);
+    assert!(s.is_err())
 }
 
 #[test]

@@ -7,7 +7,8 @@
 //! encoding/decoding primitive types, strings, opaque data and arrays.
 #![feature(slice_patterns, plugin, rustc_private, quote, box_patterns)]
 #![crate_type = "lib"]
-#[macro_use] pub extern crate syntax;
+#[macro_use]
+pub extern crate syntax;
 extern crate syntax_pos;
 extern crate rustc_errors as errors;
 extern crate xdr_codec as xdr;
@@ -36,15 +37,16 @@ use spec::{with_fake_extctxt, rustast};
 // Given an iterator returning results, return a result containing
 // either the first error or a an Ok collection.
 fn fold_result<I, T, E, C>(it: I) -> result::Result<C, E>
-    where I: IntoIterator<Item=result::Result<T, E>>, C: FromIterator<T>, E: Debug
+    where I: IntoIterator<Item = result::Result<T, E>>,
+          C: FromIterator<T>,
+          E: Debug
 {
     let (good, bad): (_, Vec<_>) = it.into_iter().partition(|res| res.is_ok());
 
-    let badness = bad.into_iter().fold(None, |cur, res|
-                                       match cur {
-                                           None => Some(res),
-                                           Some(v) => Some(v),
-                                       });
+    let badness = bad.into_iter().fold(None, |cur, res| match cur {
+        None => Some(res),
+        Some(v) => Some(v),
+    });
 
     match badness {
         Some(Err(b)) => Err(b),
@@ -53,15 +55,14 @@ fn fold_result<I, T, E, C>(it: I) -> result::Result<C, E>
     }
 }
 
-/*
-fn option_result<T, E>(optres: Option<result::Result<T, E>>) -> result::Result<Option<T>, E> {
-    match optres {
-        None => Ok(None),
-        Some(Err(e)) => Err(e),
-        Some(Ok(v)) => Ok(Some(v)),
-    }
-}
- */
+// fn option_result<T, E>(optres: Option<result::Result<T, E>>) -> result::Result<Option<T>, E> {
+// match optres {
+// None => Ok(None),
+// Some(Err(e)) => Err(e),
+// Some(Ok(v)) => Ok(Some(v)),
+// }
+// }
+//
 
 fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::Result<T, E>> {
     match resopt {
@@ -88,7 +89,8 @@ fn test_fold_result() {
 /// `infile` is simply a string used in error messages; it may be empty. `input` is a read stream of
 /// the specification, and `output` is where the generated code is sent.
 pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result<()>
-    where In: Read, Out: Write
+    where In: Read,
+          Out: Write
 {
     let mut source = String::new();
 
@@ -181,11 +183,19 @@ pub fn compile<P>(infile: P) -> Result<()>
     let input = try!(File::open(&infile));
 
     let mut outdir = PathBuf::from(env::var("OUT_DIR").unwrap_or(String::from(".")));
-    let outfile = PathBuf::from(infile.as_ref()).file_stem().unwrap().to_owned().into_string().unwrap().replace("-", "_");
+    let outfile = PathBuf::from(infile.as_ref())
+        .file_stem()
+        .unwrap()
+        .to_owned()
+        .into_string()
+        .unwrap()
+        .replace("-", "_");
 
     outdir.push(&format!("{}_xdr.rs", outfile));
 
     let output = try!(File::create(outdir));
 
-    generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"), input, output)
+    generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"),
+             input,
+             output)
 }

@@ -28,17 +28,22 @@ fn main() {
         &[ref arg] if arg.to_str() == Some("-h") => return print_usage(progname),
         &[ref fname] => {
             match generate(fname.as_os_str().to_str().unwrap_or("<unknown>"),
-                           BufReader::new(File::open(fname).unwrap()), output) {
+                           BufReader::new(File::open(fname).unwrap()),
+                           output) {
                 Ok(()) => (),
-                Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },
+                Err(e) => {
+                    let _ = writeln!(&mut err, "Failed: {}", e);
+                }
             }
-        },
+        }
         &[] => {
             match generate("stdin", BufReader::new(stdin()), output) {
                 Ok(()) => (),
-                Err(e) => { let _ = writeln!(&mut err, "Failed: {}", e); },
+                Err(e) => {
+                    let _ = writeln!(&mut err, "Failed: {}", e);
+                }
             }
-        },
+        }
         _ => return print_usage(progname),
     };
 }
