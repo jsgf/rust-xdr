@@ -18,12 +18,29 @@ fn build_test(name: &str, xdr_spec: &str) -> Result<()> {
 
     let mainfile = dir.join(format!("{}.rs", name));
     let testfile = dir.join(format!("{}_xdr.rs", name));
-    let exefile = dir.join(format!("{}", name));
+    let cargohome = dir.join(".cargo");
+    let cargotoml = dir.join("Cargo.toml");
+
+    let toml = format!(r#"
+[package]
+name = "test"
+version = "0.0.0"
+publish = false
+
+[lib]
+name = "test"
+path = "{}"
+
+[dependencies]
+xdr-codec = {{ path = "{}" }}
+"#,
+        mainfile.as_os_str().to_string_lossy(),
+        std::env::current_dir()?.join("../xdr-codec").as_os_str().to_string_lossy());
 
     let template = format!(r#"
+#![allow(dead_code, non_camel_case_types, unused_assignments, unused_imports)]
 extern crate xdr_codec;
 
-#[allow(dead_code, non_camel_case_types)]
 mod test {{
     use xdr_codec;
     include!("{}");
@@ -39,21 +56,24 @@ fn main() {{}}
     }
 
     {
+        let mut cargo = File::create(&cargotoml)?;
+        cargo.write_all(toml.as_bytes())?;
+    }
+
+    let _ = create_dir_all(&cargohome);
+
+    {
         let test = File::create(&testfile)?;
         generate(name, Cursor::new(xdr_spec.as_bytes()), test)?;
     }
 
     let compile = {
-        let mut cmd = Command::new("rustc");
+        let mut cmd = Command::new("cargo");
         let cmd = cmd
                .current_dir(std::env::current_dir()?)
-               .arg("--crate-type").arg("bin")
-               .arg("--crate-name").arg(name)
-		       .arg("-L").arg("../target/debug/deps")
-		       .arg("--extern").arg("xdr_codec=../target/debug/libxdr_codec.rlib")
-		       .arg("-o").arg(exefile)
-		       //.arg("-Z").arg("no-trans")
-		       .arg(mainfile);
+               //.env("CARGO_HOME", cargohome)
+               .arg("test")
+               .arg("--manifest-path").arg(cargotoml);
         println!("CWD: {:?} Command: {:?}", std::env::current_dir(), cmd);
         cmd.output()?
     };
@@ -131,10 +151,11 @@ default:
 #[test]
 fn simple() {
     let name = "simple";
-    let specs = vec!["struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper \
-                      hyperfoo; };",
-                     "const blop = 123;",
-                     "typedef opaque Ioaddr<>;"];
+    let specs = vec![
+        "struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper hyperfoo; };",
+        "const blop = 123;",
+        "typedef opaque Ioaddr<>;"
+    ];
 
     for (i, spec) in specs.into_iter().enumerate() {
         let name = format!("{}_{}", name, i);
