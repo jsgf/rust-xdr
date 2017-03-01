@@ -170,14 +170,14 @@ pub fn pack_array<Out, T>(val: &[T], sz: usize, out: &mut Out, defl: Option<&T>)
     let val = &val[..min(sz, val.len())];
 
     for v in val {
-        vsz += try!(v.pack(out))
+        vsz += v.pack(out)?;
     }
     assert!(vsz % 4 == 0);
 
     if val.len() < sz {
         if let Some(defl) = defl {
             for _ in val.len()..sz {
-                vsz += try!(defl.pack(out))
+                vsz += defl.pack(out)?;
             }
         } else {
             return Err(Error::InvalidLen)
@@ -195,11 +195,11 @@ pub fn pack_opaque_array<Out: Write>(val: &[u8], sz: usize, out: &mut Out) -> Re
     let val = &val[..min(sz, val.len())];
 
     vsz = val.len();
-    try!(out.write_all(val));
+    out.write_all(val)?;
 
     let p = padding(sz);
     for _ in val.len()..(sz + p.len()) {
-        try!(out.write_u8(0));
+        out.write_u8(0)?;
         vsz += 1;
     }
 
@@ -251,7 +251,7 @@ pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl
     let sz = min(arraysz, array.len());
 
     for elem in &mut array[..sz] {
-        let (v, sz) = try!(Unpack::unpack(input));
+        let (v, sz) = Unpack::unpack(input)?;
         rsz += sz;
         *elem = v;
     }
@@ -270,7 +270,7 @@ pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl
     // Mop up unused array entries on the wire
     if arraysz > array.len() {
         for _ in array.len()..arraysz {
-            let (_, sz) = try!(T::unpack(input));
+            let (_, sz) = T::unpack(input)?;
             rsz += sz;
         }
     }
@@ -291,7 +291,7 @@ pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: u
     let mut rsz = 0;
 
     while rsz < sz {
-        let r = try!(input.read(&mut bytes[rsz..]));
+        let r = input.read(&mut bytes[rsz..])?;
         rsz += r;
     }
 
@@ -306,7 +306,7 @@ pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: u
     let p = padding(bytesz).len();
     if bytes.len() < bytesz + p {
         for _ in bytes.len()..(bytesz + p) {
-            let _ = try!(input.read_u8());
+            let _ = input.read_u8()?;
             rsz += 1;
         }
     }
@@ -316,7 +316,7 @@ pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: u
 
 /// Unpack a (perhaps) length-limited array
 pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>) -> Result<(Vec<T>, usize)> {
-    let (elems, mut sz) = try!(Unpack::unpack(input));
+    let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
         return Err(Error::InvalidLen)
@@ -325,14 +325,14 @@ pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>
     let mut out = Vec::with_capacity(elems);
 
     for _ in 0..elems {
-        let (e, esz) = try!(Unpack::unpack(input));
+        let (e, esz) = Unpack::unpack(input)?;
         out.push(e);
         sz += esz;
     }
 
     let p = padding(sz);
     for _ in 0..p.len() {
-        let _ = try!(input.read_u8());
+        let _ = input.read_u8()?;
     }
     sz += p.len();
 
@@ -343,7 +343,7 @@ pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>
 ///
 /// Unpack an XDR encoded array of bytes, with an optional maximum length.
 pub fn unpack_opaque_flex<In: Read>(input: &mut In, maxsz: Option<usize>) -> Result<(Vec<u8>, usize)> {
-    let (elems, mut sz) = try!(Unpack::unpack(input));
+    let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
         return Err(Error::InvalidLen)
@@ -351,11 +351,11 @@ pub fn unpack_opaque_flex<In: Read>(input: &mut In, maxsz: Option<usize>) -> Res
 
     let mut out = Vec::with_capacity(elems);
 
-    sz += try!(input.take(elems as u64).read_to_end(&mut out));
+    sz += input.take(elems as u64).read_to_end(&mut out)?;
 
     let p = padding(sz);
     for _ in 0..p.len() {
-        let _ = try!(input.read_u8());
+        let _ = input.read_u8()?;
     }
     sz += p.len();
 
@@ -364,7 +364,7 @@ pub fn unpack_opaque_flex<In: Read>(input: &mut In, maxsz: Option<usize>) -> Res
 
 /// Unpack (perhaps) length-limited string
 pub fn unpack_string<In: Read>(input: &mut In, maxsz: Option<usize>) -> Result<(String, usize)> {
-    let (v, sz) = try!(unpack_opaque_flex(input, maxsz));
+    let (v, sz) = unpack_opaque_flex(input, maxsz)?;
 
     String::from_utf8(v).map_err(Error::from).map(|s| (s, sz))
 }
@@ -451,14 +451,14 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for [T] {
     fn pack(&self, out: &mut Out) -> Result<usize> {
         let len = self.len();
 
-        let mut sz = try!(len.pack(out));
+        let mut sz = len.pack(out)?;
         for it in self {
-            sz += try!(it.pack(out))
+            sz += it.pack(out)?;
         }
 
         let p = padding(sz);
         if p.len() > 0 {
-            try!(out.write_all(p));
+            out.write_all(p)?;
             sz += p.len();
         }
 
@@ -486,14 +486,14 @@ impl<'a, Out: Write> Pack<Out> for Opaque<'a> {
             return Err(Error::InvalidLen)
         }
 
-        sz = try!(data.len().pack(out));
+        sz = data.len().pack(out)?;
 
-        try!(out.write_all(data));
+        out.write_all(data)?;
         sz += data.len();
 
         let p = padding(sz);
         if p.len() > 0 {
-            try!(out.write_all(p));
+            out.write_all(p)?;
             sz += p.len();
         }
 
@@ -513,7 +513,7 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for Option<T> {
         match self {
             &None => false.pack(out),
             &Some(ref v) => {
-                let sz = try!(true.pack(out)) + try!(v.pack(out));
+                let sz = true.pack(out)? + v.pack(out)?;
                 Ok(sz)
             }
         }
@@ -634,20 +634,20 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Vec<T> {
 
 impl<In: Read> Unpack<In> for String {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        let (v, sz) = try!(unpack_opaque_flex(input, None));
+        let (v, sz) = unpack_opaque_flex(input, None)?;
         String::from_utf8(v).map_err(Error::from).map(|s| (s, sz))
     }
 }
 
 impl<'a, In: Read> Unpack<In> for Opaque<'a> {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        let (len, mut sz) = try!(usize::unpack(input));
+        let (len, mut sz) = usize::unpack(input)?;
         let mut v = Vec::new();
-        sz += try!(input.by_ref().take(len as u64).read_to_end(&mut v));
+        sz += input.by_ref().take(len as u64).read_to_end(&mut v)?;
 
         let p = padding(sz);
         for _ in 0..p.len() {
-            let _ = try!(input.read_u8());
+            let _ = input.read_u8()?;
             sz += 1;
         }
 
@@ -657,9 +657,9 @@ impl<'a, In: Read> Unpack<In> for Opaque<'a> {
 
 impl<In: Read, T: Unpack<In>> Unpack<In> for Option<T> {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        let (have, mut sz) = try!(Unpack::unpack(input));
+        let (have, mut sz) = Unpack::unpack(input)?;
         let ret = if have {
-            let (v, osz) = try!(Unpack::unpack(input));
+            let (v, osz) = Unpack::unpack(input)?;
             sz += osz;
             Some(v)
         } else {
@@ -671,7 +671,7 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Option<T> {
 
 impl<In: Read, T: Unpack<In>> Unpack<In> for Box<T> {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        let (b, sz) = try!(Unpack::unpack(input));
+        let (b, sz) = Unpack::unpack(input)?;
         Ok((Box::new(b), sz))
     }
 }
@@ -680,7 +680,7 @@ impl<'a, In: Read, T> Unpack<In> for Cow<'a, T>
     where T: 'a + Unpack<In> + ToOwned<Owned=T>
 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        let (b, sz) = try!(Unpack::unpack(input));
+        let (b, sz) = Unpack::unpack(input)?;
         Ok((Cow::Owned(b), sz))
     }
 }
