@@ -1,9 +1,51 @@
-extern crate xdr_codec;
-
 use std::io::Cursor;
-use xdr_codec::{Error, Pack, Unpack, Opaque,
-                pack_flex, pack_opaque_flex, pack_string, pack_array, pack_opaque_array,
-                unpack_array, unpack_opaque_array, unpack_string, unpack_flex, unpack_opaque_flex};
+use super::{Error, Pack, Unpack, Opaque,
+            pack_flex, pack_opaque_flex, pack_string, pack_array, pack_opaque_array,
+            unpack_array, unpack_opaque_array, unpack_string, unpack_flex, unpack_opaque_flex};
+
+#[cfg(feature = "bytecodec")]
+#[test]
+fn basic_8() {
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(0u8.pack(&mut out).unwrap(), 4);
+        assert_eq!(100u8.pack(&mut out).unwrap(), 4);
+        assert_eq!((-1i8).pack(&mut out).unwrap(), 4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 12);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x00,
+                           0x00, 0x00, 0x00, 0x64,
+                           0xff, 0xff, 0xff, 0xff,  ]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (0u8, 4));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (100u8, 4));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (-1i8, 4));
+    }
+
+    {
+        let mut out = Cursor::new(Vec::new());
+
+        assert_eq!(0i8.pack(&mut out).unwrap(), 4);
+        assert_eq!((-123i8).pack(&mut out).unwrap(), 4);
+        assert_eq!((-128i8).pack(&mut out).unwrap(), 4);
+
+        let v = out.into_inner();
+
+        assert_eq!(v.len(), 12);
+        assert_eq!(v, vec![0x00, 0x00, 0x00, 0x00,
+                           0xff, 0xff, 0xff, 0x85,
+                           0xff, 0xff, 0xff, 0x80  ]);
+
+        let mut input = Cursor::new(v);
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (0i8, 4));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), (-123i8, 4));
+        assert_eq!(Unpack::unpack(&mut input).unwrap(), ((1<<7) as i8, 4));
+    }
+}
 
 #[test]
 fn basic_32() {

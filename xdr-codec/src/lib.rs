@@ -7,6 +7,16 @@
 //! It provides two key traits - `Pack` and `Unpack` - which all
 //! encodable types must implement. It also provides the helper
 //! functions `pack()` and `unpack()` to simplify the API.
+//!
+//! By default, this does not implement codecs for `i8` or `u8`. This is because
+//! encoding individual bytes is quite inefficient, as they're all padded up to
+//! 32 bits (4 bytes). This doesn't matter for individual items, but arrays of
+//! bytes should be represented by opaque arrays (static size) or flex arrays
+//! (dynamic size) (or strings for character data).
+//!
+//! However, some protocols are mis-specified to use byte arrays (I'm looking at
+//! you, gluster), so the option to support the exists. You can enable byte codec
+//! with the `bytecodec` feature.
 #![crate_type = "lib"]
 
 extern crate byteorder;
@@ -23,6 +33,9 @@ use std::fmt::{self, Display, Formatter};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 pub mod record;
+
+#[cfg(test)]
+mod test;
 
 /// A wrapper around `std::result::Result` where errors are all `xdr_codec::Error`.
 pub type Result<T> = result::Result<T, Error>;
@@ -383,12 +396,27 @@ pub trait Pack<Out: Write> {
     fn pack(&self, out: &mut Out) -> Result<usize>;
 }
 
+#[cfg(feature = "bytecodec")]
+impl<Out: Write> Pack<Out> for u8 {
+    #[inline]
+    fn pack(&self, out: &mut Out) -> Result<usize> {
+        out.write_u32::<BigEndian>(*self as u32).map_err(Error::from).map(|_| 4)
+    }
+}
+
+#[cfg(feature = "bytecodec")]
+impl<Out: Write> Pack<Out> for i8 {
+    #[inline]
+    fn pack(&self, out: &mut Out) -> Result<usize> {
+        out.write_i32::<BigEndian>(*self as i32).map_err(Error::from).map(|_| 4)
+    }
+}
+
 impl<Out: Write> Pack<Out> for u32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
         out.write_u32::<BigEndian>(*self).map_err(Error::from).map(|_| 4)
     }
-
 }
 
 impl<Out: Write> Pack<Out> for i32 {
@@ -557,6 +585,22 @@ pub fn unpack<In: Read, T: Unpack<In>>(input: &mut In) -> Result<T> {
 /// as well as for arrays.
 pub trait Unpack<In: Read>: Sized {
     fn unpack(input: &mut In) -> Result<(Self, usize)>;
+}
+
+#[cfg(feature = "bytecodec")]
+impl<In: Read> Unpack<In> for u8 {
+    #[inline]
+    fn unpack(input: &mut In) -> Result<(Self, usize)> {
+        input.read_u32::<BigEndian>().map_err(Error::from).map(|v| (v as u8, 4))
+    }
+}
+
+#[cfg(feature = "bytecodec")]
+impl<In: Read> Unpack<In> for i8 {
+    #[inline]
+    fn unpack(input: &mut In) -> Result<(Self, usize)> {
+        input.read_i32::<BigEndian>().map_err(Error::from).map(|v| (v as i8, 4))
+    }
 }
 
 impl<In: Read> Unpack<In> for u32 {

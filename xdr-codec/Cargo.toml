@@ -11,7 +11,9 @@ keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 include = [ "src/**/*.rs", "tests/**/*.rs", "*.md", "Cargo.toml"  ]
 
 [features]
-unstable = []
+# Enable use of `Pack`/`Unpack` traits for `i8`/`u8`. Normally this is disabled to
+# prevent unintended use of `char thing[]` arrays when then intent was `opaque thing[]`.
+bytecodec = []
 
 [dependencies]
 byteorder = "1.*"
