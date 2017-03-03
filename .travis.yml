@@ -20,14 +20,14 @@ script:
 - |
     cd $TRAVIS_BUILD_DIR/xdr-codec &&
     travis-cargo build &&
-    travis-cargo test &&
+    travis-cargo test -- --features bytecodec &&
     travis-cargo --only stable doc &&
     : travis-cargo coveralls --no-sudo --verify
 - |
     cd $TRAVIS_BUILD_DIR/xdrgen &&
-    travis-cargo --only nightly build &&
-    travis-cargo --only nightly test &&
-    travis-cargo --only nightly doc
+    travis-cargo build &&
+    travis-cargo test &&
+    travis-cargo doc
 
 # upload coverage once work out how to deal with 2 crates
 # travis-cargo coveralls --no-sudo --verify
