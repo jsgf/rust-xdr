@@ -14,6 +14,11 @@ The syntax of the .x file follows
 for XDR but does not include RPC protocol specifications. Correspondingly,
 xdrgen does not support auto-generation of RPC clients/servers.
 
+## Changes in 0.4.0
+
+- Now uses the `quote` package, so it will work on stable Rust
+- Detects the use of Rust keywords in XDR specifications, and appends a `_` to them.
+
 ## Usage
 
 Usage is straightforward. You can generate the Rust code from a spec a build.rs:
@@ -54,9 +59,9 @@ Use can use xdr-codec's `XdrRecordReader` and `XdrRecordWriter` types as IO
 filters that implement XDR-RPC record marking.
 
 More [documentation for xdrgen
-here](https://jsgf.github.io/rust-xdr/doc/xdrgen/index.html). See the
+here](https://docs.rs/xdrgen/). See the
 [documentation for
-xdr-codec](https://jsgf.github.io/rust-xdr/doc/xdr_codec/index.html) for more
+xdr-codec](https://docs.rs/xdr-codec/) for more
 details about using the generated types and code.
 
 ## Limitations
@@ -64,8 +69,7 @@ details about using the generated types and code.
 There are currently a few limitations:
    * The generated code uses identifiers as specified in the .x file, so the
      Rust code will not use normal formatting conventions.
-   * It also does not filter for Rust keywords, so XDR specifications intended
-     for C may use identifiers like `type` or `str`.
+   * Generated code follows no formatting convention - use rustfmt if desired.
    * XDR has discriminated unions, which are a good match for Rust enums.
      However, it also supports a `default` case if an unknown discriminator
      is encountered. This crate supports this for unpacking, but not for

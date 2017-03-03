@@ -1,11 +1,11 @@
 [package]
 name = "xdr-codec"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT OR Apache-2.0"
 description = "XDR encode/decode runtime support. Pairs with xdrgen which generates code from specs."
-repository = "https://github.com/jsgf/rust-xdr-codec"
-documentation = "https://jsgf.github.io/rust-xdr/doc/xdr_codec/index.html"
+repository = "https://github.com/jsgf/rust-xdr/tree/master/xdr-codec"
+documentation = "https://docs.rs/xdr-codec"
 readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 include = [ "src/**/*.rs", "tests/**/*.rs", "*.md", "Cargo.toml"  ]

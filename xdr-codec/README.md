@@ -85,7 +85,15 @@ include!(concat!(env!("OUT_DIR"), "/mytype_xdr.rs"));
 
 ## Documentation
 
-Complete documentation is [here](https://jsgf.github.io/rust-xdr/doc/xdr_codec/index.html).
+Complete documentation is [here](https://docs.rs/xdr-codec/).
+
+## Changes in 0.4
+
+Version 0.4 added the `bytecodec` feature, which implements `Pack` and `Unpack`
+for byte types (`i8` and `u8`). This is normally unwanted, since bytes suffer from
+massive padding on the wire when used individually, or in an array of bytes (`opaque`
+is the preferred way to transport compact byte arrays). However, some protocols
+are mis-specified to use padded byte arrays, so `bytecodec` is available for them.
 
 ## Changes in 0.2
 
