@@ -281,16 +281,14 @@ impl Type {
                 match ty {
                     &Opaque | &String =>
                         quote!({
-                            use std::mem;
-                            let mut buf: [u8; #value as usize] = unsafe { mem::uninitialized() };
+                            let mut buf: [u8; #value as usize] = unsafe { ::std::mem::uninitialized() };
                             let sz = xdr_codec::unpack_opaque_array(input, &mut buf[..], #value as usize)?;
                             (buf, sz)
                         }),
                     ty => {
                         let ty = ty.as_token(symtab).unwrap();
                         quote!({
-                            use std::mem;
-                            let mut buf: [#ty; #value as usize] = unsafe { mem::uninitialized() };
+                            let mut buf: [#ty; #value as usize] = unsafe { ::std::mem::uninitialized() };
                             let sz = xdr_codec::unpack_array(input, &mut buf[..], #value as usize, None)?;
                             (buf, sz)
                         })
@@ -807,7 +805,7 @@ impl Emitpack for Typespec {
                             let label = val.as_ident();
                             let disc = match val.as_i64(symtab) {
                                 Some(v) => v as i32,
-                                None => return Err(Error::from(format!("disc val {:?} unknown", val))),
+                                None => return Err(Error::from(format!("discriminant value {:?} unknown", val))),
                             };
 
                             let ret = match decl {
