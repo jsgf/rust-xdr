@@ -23,7 +23,14 @@ fn main() {
     let mut err = stderr();
 
     let res = if let Some(fname) = matches.value_of("FILE") {
-        generate(fname, BufReader::new(File::open(fname).unwrap()), output)
+        let f = match File::open(fname) {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = writeln!(&mut err, "Failed to open {}: {}", fname, e);
+                std::process::exit(1);
+            }
+        };
+        generate(fname, BufReader::new(f), output)
     } else {
         generate("stdin", BufReader::new(stdin()), output)
     };
