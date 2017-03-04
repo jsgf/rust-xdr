@@ -1,10 +1,10 @@
 use std::collections::btree_map::{BTreeMap, Iter};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::io::{stderr, Write};
 
 use std::result;
 
-use quote::{self, Tokens};
+use quote::{self, Tokens, ToTokens};
 
 mod xdr_nom;
 
@@ -15,6 +15,33 @@ pub type Result<T> = result::Result<T, Error>;
 pub use self::xdr_nom::specification;
 
 use super::result_option;
+
+bitflags! {
+    flags Derives: u32 {
+        const COPY = 1 << 0,
+        const CLONE = 1 << 1,
+        const DEBUG = 1 << 2,
+        const EQ = 1 << 3,
+    }
+}
+
+impl ToTokens for Derives {
+    fn to_tokens(&self, toks: &mut Tokens) {
+        if self.is_empty() { return; }
+
+        toks.append("#[derive(");
+
+        let mut der = Vec::new();
+
+        if self.contains(COPY) { der.push(quote!(Copy)) }
+        if self.contains(CLONE) { der.push(quote!(Clone)) }
+        if self.contains(DEBUG) { der.push(quote!(Debug)) }
+        if self.contains(EQ) { der.push(quote!(Eq, PartialEq)) }
+
+        toks.append_separated(der, ",");
+        toks.append(")]");
+    }
+}
 
 lazy_static! {
     static ref KEYWORDS: HashSet<&'static str> = {
@@ -171,55 +198,62 @@ impl Type {
         }
     }
 
-    fn is_copyable(&self, symtab: &Symtab, memo: Option<&mut BTreeMap<Type, bool>>) -> bool {
+    fn derivable(&self, symtab: &Symtab, memo: Option<&mut HashMap<Type, Derives>>) -> Derives {
         use self::Type::*;
-        let mut memoset = BTreeMap::new();
+        let mut memoset = HashMap::new();
 
         let mut memo = match memo {
             None => &mut memoset,
             Some(m) => m,
         };
 
-        // Check to see if we have a memoized result
-        if let Some(copyable) = memo.get(self) {
-            return *copyable;
+        if let Some(res) = memo.get(self) {
+            return *res;
         }
 
-        memo.insert(self.clone(), false);   // Not copyable unless we are
+        // No derives unless we can prove we have some
+        memo.insert(self.clone(), Derives::empty());
 
-        let copyable = match self {
-            &Array(ref ty, _) => {
+        let set = match self {
+            &Array(ref ty, ref len) => {
                 let ty = ty.as_ref();
-                match ty {
-                    &Opaque | &String => true,
-                    ref ty => ty.is_copyable(symtab, Some(memo)),
+                let set = match ty {
+                    &Opaque | &String => EQ | COPY | CLONE | DEBUG,
+                    ref ty => ty.derivable(symtab, Some(memo)),
+                };
+                match len.as_i64(symtab) {
+                    Some(v) if v <= 32 => set,
+                    _ => Derives::empty(),   // no #[derive] for arrays > 32
                 }
             }
-            &Flex(..) => false,
-            &Enum(_) => true,
-
-            &Option(ref ty) => ty.is_copyable(symtab, Some(memo)),
-
-            &Struct(ref fields) => fields.iter().all(|f| f.is_copyable(symtab, memo)),
+            &Flex(ref ty, ..) => {
+                let set = ty.derivable(symtab, Some(memo));
+                set & !COPY // no Copy, everything else OK
+            }
+            &Enum(_) => EQ | COPY | CLONE | DEBUG,
+            &Option(ref ty) => ty.derivable(symtab, Some(memo)),
+            &Struct(ref fields) => fields.iter().fold(Derives::all(), |a, f| a & f.derivable(symtab, memo)),
 
             &Union(_, ref cases, ref defl) => {
-                cases.iter().map(|c| &c.1).all(|d| d.is_copyable(symtab, memo)) &&
-                defl.as_ref().map_or(true, |d| d.is_copyable(symtab, memo))
+                cases.iter().map(|c| &c.1).fold(Derives::all(), |a, c| a & c.derivable(symtab, memo)) &
+                defl.as_ref().map_or(Derives::all(), |d| d.derivable(symtab, memo))
             }
 
             &Ident(ref id) => {
                 match symtab.typespec(id) {
-                    None => false,  // unknown, really
-                    Some(ref ty) => ty.is_copyable(symtab, Some(memo)),
+                    None => Derives::empty(),  // unknown, really
+                    Some(ref ty) => ty.derivable(symtab, Some(memo)),
                 }
             }
 
-            _ => self.is_prim(symtab),
+            ty if ty.is_prim(symtab) => Derives::all(),
+            _ => Derives::all() & !COPY,
         };
 
-        memo.insert(self.clone(), copyable);
-        copyable
+        memo.insert(self.clone(), set);
+        set
     }
+
 
     fn packer(&self, val: Tokens, symtab: &Symtab) -> Result<Tokens> {
         use self::Type::*;
@@ -427,11 +461,11 @@ impl Decl {
         }
     }
 
-    fn is_copyable(&self, symtab: &Symtab, memo: &mut BTreeMap<Type, bool>) -> bool {
+    fn derivable(&self, symtab: &Symtab, memo: &mut HashMap<Type, Derives>) -> Derives {
         use self::Decl::*;
         match self {
-            &Void => true,
-            &Named(_, ref ty) => ty.is_copyable(symtab, Some(memo)),
+            &Void => Derives::all(),
+            &Named(_, ref ty) => ty.derivable(symtab, Some(memo)),
         }
     }
 }
@@ -515,7 +549,8 @@ impl Emit for Typespec {
                     .map(|(field, val)| quote!(#field = #val,))
                     .collect();
 
-                quote!(#[derive(Debug, Eq, PartialEq, Copy, Clone)] pub enum #name { #(#defs)* })
+                let derive = ty.derivable(symtab, None);
+                quote!(#derive pub enum #name { #(#defs)* })
             }
 
             &Struct(ref decls) => {
@@ -524,11 +559,7 @@ impl Emit for Typespec {
                     .map(|res| res.map(|(field, ty)| quote!(pub #field: #ty,)))
                     .collect::<Result<Vec<_>>>()?;
 
-                let derive = if ty.is_copyable(symtab, None) {
-                    quote!(#[derive(Debug, Eq, PartialEq, Clone, Copy)])
-                } else {
-                    quote!(#[derive(Debug, Eq, PartialEq, Clone)])
-                };
+                let derive = ty.derivable(symtab, None);
                 quote! {
                     #derive
                     pub struct #name { #(#decls)* }
@@ -627,11 +658,7 @@ impl Emit for Typespec {
                     }
                 }
 
-                let derive = if ty.is_copyable(symtab, None) {
-                    quote!(#[derive(Debug, Eq, PartialEq, Clone, Copy)])
-                } else {
-                    quote!(#[derive(Debug, Eq, PartialEq, Clone)])
-                };
+                let derive = ty.derivable(symtab, None);
                 quote! {
                     #derive
                     pub enum #name { #(#cases)* }
@@ -640,8 +667,9 @@ impl Emit for Typespec {
 
             &Flex(..) | &Array(..) => {
                 let tok = ty.as_token(symtab)?;
+                let derive = ty.derivable(symtab, None);
                 quote! {
-                    #[derive(Debug, Eq, PartialEq, Clone)]
+                    #derive
                     pub struct #name(pub #tok);
                 }
             }

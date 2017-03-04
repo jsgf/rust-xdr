@@ -274,6 +274,7 @@ fn arrays() {
         struct b { int things[10]; };
         struct c { string decitweet[14]; };
         struct d { c tweetses[10]; };
+        struct big { c tweetses[100]; };
     "#;
 
     if let Err(e) = build_test(name, spec) {

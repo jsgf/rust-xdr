@@ -20,6 +20,9 @@ extern crate log;
 #[macro_use]
 extern crate nom;
 
+#[macro_use]
+extern crate bitflags;
+
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
@@ -97,7 +100,7 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
                      r#"
 // GENERATED CODE
 //
-// Generated from {}.
+// Generated from {} by xdrgen.
 //
 // DO NOT EDIT
 
