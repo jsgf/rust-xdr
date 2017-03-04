@@ -86,10 +86,10 @@ impl<R: BufRead> XdrRecordReader<R> {
 impl<R: BufRead> Read for XdrRecordReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let nread = {
-            let data = try!(self.fill_buf());
+            let data = self.fill_buf()?;
             let len = min(buf.len(), data.len());
 
-            try!((&data[..len]).read(buf))
+            (&data[..len]).read(buf)?
         };
 
         self.consume(nread);
@@ -100,13 +100,13 @@ impl<R: BufRead> Read for XdrRecordReader<R> {
 impl<R: BufRead> BufRead for XdrRecordReader<R> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         while self.totremains() == 0 {
-            if try!(self.nextrec()) {
+            if self.nextrec()? {
                 return Ok(&[])
             }
         }
 
         let remains = self.totremains();
-        let data = try!(self.reader.fill_buf());
+        let data = self.reader.fill_buf()?;
         Ok(&data[..min(data.len(), remains)])
     }
 
@@ -212,8 +212,8 @@ impl<W: Write> XdrRecordWriter<W> {
 
         let rechdr = self.buf.len() as u32 | (if eor { LAST_REC } else { 0 });
 
-        try!(pack(&rechdr, &mut self.writer).map_err(mapioerr));
-        let _ = try!(self.writer.write_all(&self.buf).map(|_| ()));
+        pack(&rechdr, &mut self.writer).map_err(mapioerr)?;
+        let _ = self.writer.write_all(&self.buf).map(|_| ())?;
         self.buf.truncate(0);
 
         self.eor = eor;
@@ -236,7 +236,7 @@ impl<W: Write> Write for XdrRecordWriter<W> {
         while off < buf.len() {
             let chunk = &buf[off..off+min(buf.len() - off, self.bufsz)];
             if self.buf.len() + chunk.len() > self.bufsz {
-                try!(self.flush())
+                self.flush()?;
             }
 
             self.buf.extend(chunk);
