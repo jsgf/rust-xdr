@@ -20,115 +20,21 @@
 #![crate_type = "lib"]
 
 extern crate byteorder;
+#[macro_use] extern crate error_chain;
 
-use std::io;
 pub use std::io::{Write, Read};
 use std::ops::Deref;
 use std::cmp::min;
 use std::borrow::{Cow, Borrow};
-use std::error;
-use std::result;
-use std::string;
-use std::fmt::{self, Display, Formatter};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 pub mod record;
 
+mod error;
+pub use error::*;
+
 #[cfg(test)]
 mod test;
-
-/// A wrapper around `std::result::Result` where errors are all `xdr_codec::Error`.
-pub type Result<T> = result::Result<T, Error>;
-
-/// XDR errors
-///
-/// This simply amalgamates the various errors which can arise.
-#[derive(Debug)]
-pub enum Error {
-    /// An underlying IO error.
-    IOError(io::Error),
-    /// An improperly encoded String.
-    InvalidUtf8(string::FromUtf8Error),
-    /// Encoding discriminated union with a bad (default) case.
-    InvalidCase,
-    /// Decoding a bad enum value
-    InvalidEnum,
-    /// Array/String too long
-    InvalidLen,
-    /// Generic error.
-    Generic(String),
-}
-
-impl Error {
-    pub fn invalidcase() -> Error {
-        Error::InvalidCase
-    }
-
-    pub fn invalidenum() -> Error {
-        Error::InvalidEnum
-    }
-
-    pub fn invalidlen() -> Error {
-        Error::InvalidLen
-    }
-
-    pub fn badutf8(err: string::FromUtf8Error) -> Error {
-        Error::InvalidUtf8(err)
-    }
-
-    pub fn generic<T>(err: T) -> Error
-        where T: Display + error::Error
-    {
-        Error::Generic(format!("{}", err))
-    }
-}
-
-impl From<String> for Error {
-    fn from(str: String) -> Self { Error::Generic(str) }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self { Error::IOError(err) }
-}
-
-impl<'a> From<&'a str> for Error {
-    fn from(err: &'a str) -> Self { Error::Generic(String::from(err)) }
-}
-
-impl From<string::FromUtf8Error> for Error {
-    fn from(err: string::FromUtf8Error) -> Self { Error::InvalidUtf8(err) }
-}
-
-unsafe impl Send for Error {}
-unsafe impl Sync for Error {}
-
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        match self {
-            &Error::IOError(ref ioe) => ioe.description(),
-            &Error::InvalidUtf8(ref se) => se.description(),
-            &Error::Generic(ref s) => s,
-            &Error::InvalidCase => "invalid switch case",
-            &Error::InvalidEnum => "invalid enum value",
-            &Error::InvalidLen => "invalid string/array length",
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        match self {
-            &Error::IOError(ref ioe) => Some(ioe),
-            &Error::InvalidUtf8(ref se) => Some(se),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), fmt::Error> {
-        use std::error::Error;
-        write!(fmt, "{}", self.description())
-    }
-}
 
 static PADDING: [u8; 4] = [0; 4];
 
@@ -193,7 +99,7 @@ pub fn pack_array<Out, T>(val: &[T], sz: usize, out: &mut Out, defl: Option<&T>)
                 vsz += defl.pack(out)?;
             }
         } else {
-            return Err(Error::InvalidLen)
+            bail!(ErrorKind::InvalidLen(sz));
         }
     }
     Ok(vsz)
@@ -225,7 +131,7 @@ pub fn pack_opaque_array<Out: Write>(val: &[u8], sz: usize, out: &mut Out) -> Re
 #[inline]
 pub fn pack_flex<Out: Write, T: Pack<Out>>(val: &[T], maxsz: Option<usize>, out: &mut Out) -> Result<usize> {
     if maxsz.map_or(false, |m| val.len() > m) {
-        return Err(Error::InvalidLen)
+        bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
 
     val.pack(out)
@@ -237,7 +143,7 @@ pub fn pack_flex<Out: Write, T: Pack<Out>>(val: &[T], maxsz: Option<usize>, out:
 #[inline]
 pub fn pack_opaque_flex<Out: Write>(val: &[u8], maxsz: Option<usize>, out: &mut Out) -> Result<usize> {
     if maxsz.map_or(false, |m| val.len() > m) {
-        return Err(Error::InvalidLen)
+        bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
 
     Opaque::borrowed(val).pack(out)
@@ -276,7 +182,7 @@ pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl
                 *elem = defl.clone();
             }
         } else {
-            return Err(Error::InvalidLen)
+            bail!(ErrorKind::InvalidLen(arraysz));
         }
     }
 
@@ -332,7 +238,7 @@ pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>
     let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
-        return Err(Error::InvalidLen)
+        bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
 
     let mut out = Vec::with_capacity(elems);
@@ -359,7 +265,7 @@ pub fn unpack_opaque_flex<In: Read>(input: &mut In, maxsz: Option<usize>) -> Res
     let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
-        return Err(Error::InvalidLen)
+        bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
 
     let mut out = Vec::with_capacity(elems);
@@ -498,7 +404,7 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for Vec<T> {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
         if self.len() > u32::max_value() as usize {
-            return Err(Error::InvalidLen);
+            return Err(ErrorKind::InvalidLen(self.len()).into());
         }
 
         (&self[..]).pack(out)
@@ -511,7 +417,7 @@ impl<'a, Out: Write> Pack<Out> for Opaque<'a> {
         let data: &[u8] = self.0.borrow();
 
         if data.len() > u32::max_value() as usize {
-            return Err(Error::InvalidLen)
+            return Err(ErrorKind::InvalidLen(data.len()).into())
         }
 
         sz = data.len().pack(out)?;
@@ -646,12 +552,12 @@ impl<In: Read> Unpack<In> for f64 {
 impl<In: Read> Unpack<In> for bool {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        u32::unpack(input)
+        i32::unpack(input)
             .and_then(|(v, sz)|
                       match v {
                           0 => Ok((false, sz)),
                           1 => Ok((true, sz)),
-                          _ => Err(Error::InvalidEnum)
+                          v => Err(ErrorKind::InvalidEnum(v).into()),
                       })
     }
 }

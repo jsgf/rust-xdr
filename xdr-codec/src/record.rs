@@ -15,13 +15,15 @@
 use std::io::{self, Read, BufRead, Write};
 use std::cmp::min;
 
+use error::*;
+
 use super::{unpack, pack, Error};
 
 const LAST_REC: u32 = 1u32 << 31;
 
 fn mapioerr(xdrerr: Error) -> io::Error {
     match xdrerr {
-        Error::IOError(ioerr) => ioerr,
+        Error(ErrorKind::IOError(ioerr), _) => ioerr,
         other => io::Error::new(io::ErrorKind::Other, other),
     }
 }
@@ -60,8 +62,10 @@ impl<R: BufRead> XdrRecordReader<R> {
         let rechdr: u32 =
             match unpack(&mut self.reader) {
                 Ok(v) => v,
-                Err(Error::IOError(ref err)) if err.kind() == io::ErrorKind::UnexpectedEof => return Ok(true),
-                Err(e) => return Err(mapioerr(e)),
+                Err(Error(ErrorKind::IOError(ref err), _)) if err.kind() == io::ErrorKind::UnexpectedEof =>
+                    return Ok(true),
+                Err(e) =>
+                    return Err(mapioerr(e)),
             };
 
         self.size = (rechdr & !LAST_REC) as usize;

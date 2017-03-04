@@ -409,7 +409,7 @@ impl Type {
                 quote!(#id)
             }
 
-            _ => return Err(Error::from(format!("can't have unnamed type {:?}", self))),
+            _ => return Err(format!("can't have unnamed type {:?}", self).into()),
         };
         Ok(ret)
     }
@@ -734,10 +734,15 @@ impl Emitpack for Typespec {
 
                 if let &Some(ref decl) = defl {
                     let decl = decl.as_ref();
+                    // Can't cast a value-carrying enum to i32
                     let default =
                         match decl {
-                            &Void => quote!(&#name::default => return Err(xdr_codec::Error::invalidcase()),),
-                            &Named(_, _) => quote!(&#name::default(_) => return Err(xdr_codec::Error::invalidcase()),),
+                            &Void => quote! {
+                                &#name::default => return Err(xdr_codec::Error::invalidcase(-1)),
+                            },
+                            &Named(_, _) => quote! {
+                                &#name::default(_) => return Err(xdr_codec::Error::invalidcase(-1)),
+                            },
                         };
 
                     matches.push(default)
@@ -808,7 +813,7 @@ impl Emitpack for Typespec {
                     sz += esz;
                     match e {
                         #(#matchdefs)*
-                        _ => return Err(xdr_codec::Error::invalidenum())
+                        e => return Err(xdr_codec::Error::invalidenum(e))
                     }
                 })
             }
@@ -865,7 +870,7 @@ impl Emitpack for Typespec {
 
                     matches.push(defl);
                 } else {
-                    let defl = quote!(_ => return Err(xdr_codec::Error::invalidcase()));
+                    let defl = quote!(v => return Err(xdr_codec::Error::invalidcase(v as i32)));
                     matches.push(defl);
                 }
 

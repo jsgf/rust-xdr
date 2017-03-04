@@ -5,7 +5,7 @@ use std::io::Cursor;
 use std::fmt::Debug;
 use std::iter;
 
-use xdr_codec::{Pack, Unpack, Error, padding, pack_array, unpack_array, pack_opaque_array, unpack_opaque_array};
+use xdr_codec::{Pack, Unpack, Error, ErrorKind, padding, pack_array, unpack_array, pack_opaque_array, unpack_opaque_array};
 use quickcheck::{quickcheck, Arbitrary};
 
 // Output of packing is a multiple of 4
@@ -47,7 +47,7 @@ fn short_unpack<T>(v: T) -> bool
 
     let mut data = Cursor::new(data);
     match T::unpack(&mut data) {
-        Err(Error::IOError(_)) => true,
+        Err(Error(ErrorKind::IOError(_), _)) => true,
         _ => false,
     }
 }
@@ -145,7 +145,7 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
     // pack data we have into the array
     let tsz = match pack_array(&data[..], arraysz, &mut buf, defl.as_ref()) {
         Ok(tsz) if data.len() >= arraysz || defl.is_some() => tsz,
-        e@Err(Error::InvalidLen) => {
+        e@Err(Error(ErrorKind::InvalidLen(_), _)) => {
             let pass = defl.is_none() && data.len() < arraysz;
             if !pass { println!("pack_array failed {:?}, defl {:?} data.len {} arraysz {}", e, defl, data.len(), arraysz) }
             return pass
@@ -175,7 +175,7 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
     // unpack rxsize elements
     let rsz = match unpack_array(&mut cur, &mut recv[..], arraysz, defl.as_ref()) {
         Ok(rsz) if recv.len() <= arraysz || defl.is_some() => rsz,                  // normal success
-        Err(Error::InvalidLen) =>
+        Err(Error(ErrorKind::InvalidLen(_), _)) =>
             return defl.is_none() && recv.len() > arraysz,    // expected if recv is too big and there's no default
         Err(e) => {
             println!("unpack_array failed {:?}", e);
