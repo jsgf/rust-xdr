@@ -22,6 +22,7 @@ bitflags! {
         const CLONE = 1 << 1,
         const DEBUG = 1 << 2,
         const EQ = 1 << 3,
+        const PARTIALEQ = 1 << 4,
     }
 }
 
@@ -36,7 +37,8 @@ impl ToTokens for Derives {
         if self.contains(COPY) { der.push(quote!(Copy)) }
         if self.contains(CLONE) { der.push(quote!(Clone)) }
         if self.contains(DEBUG) { der.push(quote!(Debug)) }
-        if self.contains(EQ) { der.push(quote!(Eq, PartialEq)) }
+        if self.contains(EQ) { der.push(quote!(Eq)) }
+        if self.contains(PARTIALEQ) { der.push(quote!(PartialEq)) }
 
         toks.append_separated(der, ",");
         toks.append(")]");
@@ -218,7 +220,7 @@ impl Type {
             &Array(ref ty, ref len) => {
                 let ty = ty.as_ref();
                 let set = match ty {
-                    &Opaque | &String => EQ | COPY | CLONE | DEBUG,
+                    &Opaque | &String => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
                     ref ty => ty.derivable(symtab, Some(memo)),
                 };
                 match len.as_i64(symtab) {
@@ -230,7 +232,7 @@ impl Type {
                 let set = ty.derivable(symtab, Some(memo));
                 set & !COPY // no Copy, everything else OK
             }
-            &Enum(_) => EQ | COPY | CLONE | DEBUG,
+            &Enum(_) => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
             &Option(ref ty) => ty.derivable(symtab, Some(memo)),
             &Struct(ref fields) => fields.iter().fold(Derives::all(), |a, f| a & f.derivable(symtab, memo)),
 
@@ -246,7 +248,9 @@ impl Type {
                 }
             }
 
+            &Float | &Double => PARTIALEQ | COPY | CLONE | DEBUG,
             ty if ty.is_prim(symtab) => Derives::all(),
+
             _ => Derives::all() & !COPY,
         };
 

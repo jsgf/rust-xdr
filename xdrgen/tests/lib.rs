@@ -296,3 +296,15 @@ fn flex() {
         panic!("test {} failed: {}", name, e);
     }
 }
+
+#[test]
+fn derive_float() {
+    let name = "derive_float";
+    let spec = r#"
+    struct a { float a; double b; };
+    "#;
+
+    if let Err(e) = build_test(name, spec) {
+        panic!("test {} failed: {}", name, e);
+    }
+}
