@@ -210,6 +210,7 @@ kw!(kw_int, b"int");
 kw!(kw_long, b"long");          // special case - part time keyword
 kw!(kw_opaque, b"opaque");
 kw!(kw_quadruple, b"quadruple");
+kw!(kw_short, b"short");        // special case - part time keyword
 kw!(kw_string, b"string");
 kw!(kw_struct, b"struct");
 kw!(kw_switch, b"switch");
@@ -504,12 +505,14 @@ fn test_decls() {
 named!(type_spec<Type>,
        preceded!(spaces,
                  alt!(chain!(kw_unsigned ~ kw_int, || Type::UInt) |
-                      chain!(kw_unsigned ~ kw_long, || Type::UInt) |        // backwards compat with rpcgen
-                      chain!(kw_unsigned ~ kw_char, || Type::ident("u8")) | // backwards compat with rpcgen
+                      chain!(kw_unsigned ~ kw_long, || Type::UInt) |          // backwards compat with rpcgen
+                      chain!(kw_unsigned ~ kw_char, || Type::ident("u8")) |   // backwards compat with rpcgen
+                      chain!(kw_unsigned ~ kw_short, || Type::UInt) |         // backwards compat with rpcgen
                       chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
-                      kw_unsigned => { |_| Type::UInt } |                   // backwards compat with rpcgen
-                      kw_long => { |_| Type::Int } |                        // backwards compat with rpcgen
-                      kw_char => { |_| Type::ident("i8") } |                // backwards compat with rpcgen
+                      kw_unsigned => { |_| Type::UInt } |                     // backwards compat with rpcgen
+                      kw_long => { |_| Type::Int } |                          // backwards compat with rpcgen
+                      kw_char => { |_| Type::ident("i8") } |                  // backwards compat with rpcgen
+                      kw_short => { |_| Type::Int } |                         // backwards compat with rpcgen
                       kw_int => { |_| Type::Int } |
                       kw_hyper => { |_| Type::Hyper } |
                       kw_float => { |_| Type::Float } |
@@ -535,10 +538,17 @@ fn test_type() {
 
     assert_eq!(type_spec(&b"unsigned hyper "[..]), Done(&b" "[..], Type::UHyper));
 
+    assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..], Type::Ident("u8".into())));
+    assert_eq!(type_spec(&b"unsigned short "[..]), Done(&b" "[..], Type::UInt));
+
     assert_eq!(type_spec(&b" hyper "[..]), Done(&b" "[..], Type::Hyper));
     assert_eq!(type_spec(&b" double "[..]), Done(&b" "[..], Type::Double));
     assert_eq!(type_spec(&b"// thing\nquadruple "[..]), Done(&b" "[..], Type::Quadruple));
     assert_eq!(type_spec(&b"// thing\n bool "[..]), Done(&b" "[..], Type::Bool));
+
+    assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..], Type::Ident("i8".into())));
+    assert_eq!(type_spec(&b"short "[..]), Done(&b" "[..], Type::Int));
+
 
     assert_eq!(type_spec(&b"struct { int a; int b; } "[..]),
                Done(&b" "[..],
