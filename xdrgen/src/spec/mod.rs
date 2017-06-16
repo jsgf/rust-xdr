@@ -17,7 +17,7 @@ pub use self::xdr_nom::specification;
 use super::result_option;
 
 bitflags! {
-    flags Derives: u32 {
+    pub flags Derives: u32 {
         const COPY = 1 << 0,
         const CLONE = 1 << 1,
         const DEBUG = 1 << 2,
@@ -142,7 +142,7 @@ pub enum Type {
     Flex(Box<Type>, Option<Value>),
 
     // Type reference (may be external)
-    Ident(String),
+    Ident(String, Option<Derives>),
 }
 
 impl Type {
@@ -163,7 +163,11 @@ impl Type {
     }
 
     fn ident<S: AsRef<str>>(id: S) -> Type {
-        Type::Ident(id.as_ref().to_string())
+        Type::Ident(id.as_ref().to_string(), None)
+    }
+
+    fn ident_with_derives<S: AsRef<str>>(id: S, derives: Derives) -> Type {
+        Type::Ident(id.as_ref().to_string(), Some(derives))
     }
 
     fn is_boxed(&self, symtab: &Symtab) -> bool {
@@ -172,7 +176,7 @@ impl Type {
         match self {
             _ if self.is_prim(symtab) => false,
             &Array(_, _) | &Flex(_, _) | &Option(_) => false,
-            &Ident(ref name) => {
+            &Ident(ref name, _) => {
                 if let Some(ty) = symtab.typespec(name) {
                     ty.is_boxed(symtab)
                 } else {
@@ -189,7 +193,7 @@ impl Type {
         match self {
             &Int | &UInt | &Hyper | &UHyper | &Float | &Double | &Quadruple | &Bool => true,
 
-            &Ident(ref id) => {
+            &Ident(ref id, _) => {
                 match symtab.typespec(id) {
                     None => false,
                     Some(ref ty) => ty.is_prim(symtab),
@@ -241,7 +245,9 @@ impl Type {
                 defl.as_ref().map_or(Derives::all(), |d| d.derivable(symtab, memo))
             }
 
-            &Ident(ref id) => {
+            &Ident(_, Some(derives)) => derives,
+
+            &Ident(ref id, None) => {
                 match symtab.typespec(id) {
                     None => Derives::empty(),  // unknown, really
                     Some(ref ty) => ty.derivable(symtab, Some(memo)),
@@ -302,7 +308,7 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Opaque | &String | &Option(_) | &Ident(_) | &Int | &UInt | &Hyper | &UHyper |
+            &Opaque | &String | &Option(_) | &Ident(..) | &Int | &UInt | &Hyper | &UHyper |
             &Float | &Double | &Quadruple | &Bool => true,
             _ => false,
         }
@@ -408,7 +414,7 @@ impl Type {
                 }
             }
 
-            &Ident(ref name) => {
+            &Ident(ref name, _) => {
                 let id = quote_ident(name.as_str());
                 quote!(#id)
             }
@@ -603,7 +609,7 @@ impl Emit for Typespec {
                             if *seltype == Bool {
                                 id == "TRUE" || id == "FALSE"
                             } else {
-                                if let &Type::Ident(ref selname) = seltype {
+                                if let &Type::Ident(ref selname, _) = seltype {
                                     match symtab.getconst(id) {
                                         Some((_, Some(ref scope))) => scope == selname,
                                         _ => false,
@@ -758,7 +764,7 @@ impl Emitpack for Typespec {
             // Array and Flex types are wrapped in tuple structs
             &Flex(..) | &Array(..) => ty.packer(quote!(self.0), symtab)?,
 
-            &Ident(_) => return Ok(None),
+            &Ident(_, _) => return Ok(None),
 
             _ => {
                 if ty.is_prim(symtab) {
@@ -893,7 +899,7 @@ impl Emitpack for Typespec {
                 quote!({ let (v, usz) = #unpk; sz = usz; #name(v) })
             }
 
-            &Ident(_) => return Ok(None),
+            &Ident(_, _) => return Ok(None),
 
             _ if ty.is_prim(symtab) => return Ok(None),
             _ => return Err(Error::from(format!("unimplemented ty={:?}", ty))),

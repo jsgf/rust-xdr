@@ -5,6 +5,7 @@ use nom::IResult::*;
 use std::str;
 
 use super::{Value, Type, Decl, Defn, EnumDefn, UnionCase};
+use super::{COPY, CLONE, EQ, PARTIALEQ, DEBUG};
 
 #[inline]
 fn ignore<T>(_: T) -> () {
@@ -506,12 +507,14 @@ named!(type_spec<Type>,
        preceded!(spaces,
                  alt!(chain!(kw_unsigned ~ kw_int, || Type::UInt) |
                       chain!(kw_unsigned ~ kw_long, || Type::UInt) |          // backwards compat with rpcgen
-                      chain!(kw_unsigned ~ kw_char, || Type::ident("u8")) |   // backwards compat with rpcgen
+                      chain!(kw_unsigned ~ kw_char,                           // backwards compat with rpcgen
+                        || Type::ident_with_derives("u8", COPY | CLONE | EQ | PARTIALEQ | DEBUG)) |
                       chain!(kw_unsigned ~ kw_short, || Type::UInt) |         // backwards compat with rpcgen
                       chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
                       kw_unsigned => { |_| Type::UInt } |                     // backwards compat with rpcgen
                       kw_long => { |_| Type::Int } |                          // backwards compat with rpcgen
-                      kw_char => { |_| Type::ident("i8") } |                  // backwards compat with rpcgen
+                      kw_char => {                                            // backwards compat with rpcgen
+                          |_| Type::ident_with_derives("i8", COPY | CLONE | EQ | PARTIALEQ | DEBUG) } |
                       kw_short => { |_| Type::Int } |                         // backwards compat with rpcgen
                       kw_int => { |_| Type::Int } |
                       kw_hyper => { |_| Type::Hyper } |
@@ -538,7 +541,8 @@ fn test_type() {
 
     assert_eq!(type_spec(&b"unsigned hyper "[..]), Done(&b" "[..], Type::UHyper));
 
-    assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..], Type::Ident("u8".into())));
+    assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..],
+        Type::Ident("u8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
     assert_eq!(type_spec(&b"unsigned short "[..]), Done(&b" "[..], Type::UInt));
 
     assert_eq!(type_spec(&b" hyper "[..]), Done(&b" "[..], Type::Hyper));
@@ -546,7 +550,9 @@ fn test_type() {
     assert_eq!(type_spec(&b"// thing\nquadruple "[..]), Done(&b" "[..], Type::Quadruple));
     assert_eq!(type_spec(&b"// thing\n bool "[..]), Done(&b" "[..], Type::Bool));
 
-    assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..], Type::Ident("i8".into())));
+    assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..],
+        Type::Ident("i8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
+
     assert_eq!(type_spec(&b"short "[..]), Done(&b" "[..], Type::Int));
 
 
