@@ -87,6 +87,13 @@ include!(concat!(env!("OUT_DIR"), "/mytype_xdr.rs"));
 
 Complete documentation is [here](https://docs.rs/xdr-codec/).
 
+## Changes in 0.4.2
+
+Implement standard traits for `char`/`unsigned char` (`i8`/`u8` in Rust).
+
+Also handle `short`/`unsigned short` as an extension in .x files. They are still
+represented in memory as `i32`/`u32`.
+
 ## Changes in 0.4
 
 Version 0.4 added the `bytecodec` feature, which implements `Pack` and `Unpack`
