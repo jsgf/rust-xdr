@@ -1,6 +1,6 @@
 [package]
 name = "xdr-codec"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT OR Apache-2.0"
 description = "XDR encode/decode runtime support. Pairs with xdrgen which generates code from specs."
@@ -18,7 +18,7 @@ bytecodec = []
 unstable = []
 
 [dependencies]
-byteorder = "1.*"
+byteorder = "1.0"
 error-chain = "0.10"
 
 [dev-dependencies]
