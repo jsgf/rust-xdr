@@ -17,12 +17,12 @@ pub use self::xdr_nom::specification;
 use super::result_option;
 
 bitflags! {
-    pub flags Derives: u32 {
-        const COPY = 1 << 0,
-        const CLONE = 1 << 1,
-        const DEBUG = 1 << 2,
-        const EQ = 1 << 3,
-        const PARTIALEQ = 1 << 4,
+    pub struct Derives: u32 {
+        const COPY = 1 << 0;
+        const CLONE = 1 << 1;
+        const DEBUG = 1 << 2;
+        const EQ = 1 << 3;
+        const PARTIALEQ = 1 << 4;
     }
 }
 
