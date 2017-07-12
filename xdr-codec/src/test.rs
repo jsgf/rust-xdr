@@ -1,7 +1,11 @@
+// Don't rustfmt in here to avoid trashing vec![] formatting
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 use std::io::Cursor;
 use super::{Error, ErrorKind, Pack, Unpack, Opaque,
             pack_flex, pack_opaque_flex, pack_string, pack_array, pack_opaque_array,
             unpack_array, unpack_opaque_array, unpack_string, unpack_flex, unpack_opaque_flex};
+
 
 #[cfg(feature = "bytecodec")]
 #[test]

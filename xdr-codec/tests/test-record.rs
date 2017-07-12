@@ -1,6 +1,10 @@
+// Don't rustfmt in here to avoid trashing vec![] formatting
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 extern crate xdr_codec;
 
 use std::io::{Read, Write, Cursor};
+
 use xdr_codec::record::{XdrRecordReader, XdrRecordWriter};
 
 #[test]
