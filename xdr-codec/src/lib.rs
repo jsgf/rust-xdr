@@ -20,13 +20,14 @@
 #![crate_type = "lib"]
 
 extern crate byteorder;
-#[macro_use] extern crate error_chain;
+#[macro_use]
+extern crate error_chain;
 
-pub use std::io::{Write, Read};
+pub use std::io::{Read, Write};
 use std::ops::Deref;
 use std::cmp::min;
-use std::borrow::{Cow, Borrow};
-use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
+use std::borrow::{Borrow, Cow};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod record;
 
@@ -56,17 +57,25 @@ pub fn padding(sz: usize) -> &'static [u8] {
 pub struct Opaque<'a>(pub Cow<'a, [u8]>);
 
 impl<'a> Opaque<'a> {
-    pub fn owned(v: Vec<u8>) -> Opaque<'a> { Opaque(Cow::Owned(v)) }
-    pub fn borrowed(v: &'a [u8]) -> Opaque<'a> { Opaque(Cow::Borrowed(v)) }
+    pub fn owned(v: Vec<u8>) -> Opaque<'a> {
+        Opaque(Cow::Owned(v))
+    }
+    pub fn borrowed(v: &'a [u8]) -> Opaque<'a> {
+        Opaque(Cow::Borrowed(v))
+    }
 }
 
 impl<'a> Deref for Opaque<'a> {
     type Target = [u8];
-    fn deref(&self) -> &[u8] { self.0.deref() }
+    fn deref(&self) -> &[u8] {
+        self.0.deref()
+    }
 }
 
 impl<'a> From<&'a [u8]> for Opaque<'a> {
-    fn from(v: &'a [u8]) -> Self { Opaque::borrowed(v) }
+    fn from(v: &'a [u8]) -> Self {
+        Opaque::borrowed(v)
+    }
 }
 
 /// Serialization (packing) helper.
@@ -83,7 +92,9 @@ pub fn pack<Out: Write, T: Pack<Out>>(val: &T, out: &mut Out) -> Result<()> {
 /// default values (if provided). If the array is too small and there's no pad/default value, then it fails
 /// with `Error::InvalidLen`.
 pub fn pack_array<Out, T>(val: &[T], sz: usize, out: &mut Out, defl: Option<&T>) -> Result<usize>
-    where Out: Write, T: Pack<Out>
+where
+    Out: Write,
+    T: Pack<Out>,
 {
     let mut vsz = 0;
     let val = &val[..min(sz, val.len())];
@@ -129,7 +140,11 @@ pub fn pack_opaque_array<Out: Write>(val: &[u8], sz: usize, out: &mut Out) -> Re
 ///
 /// This packs an array of packable objects, and also applies an optional size limit.
 #[inline]
-pub fn pack_flex<Out: Write, T: Pack<Out>>(val: &[T], maxsz: Option<usize>, out: &mut Out) -> Result<usize> {
+pub fn pack_flex<Out: Write, T: Pack<Out>>(
+    val: &[T],
+    maxsz: Option<usize>,
+    out: &mut Out,
+) -> Result<usize> {
     if maxsz.map_or(false, |m| val.len() > m) {
         bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
@@ -141,7 +156,11 @@ pub fn pack_flex<Out: Write, T: Pack<Out>>(val: &[T], maxsz: Option<usize>, out:
 ///
 /// This packs an array of packable objects, and also applies an optional size limit.
 #[inline]
-pub fn pack_opaque_flex<Out: Write>(val: &[u8], maxsz: Option<usize>, out: &mut Out) -> Result<usize> {
+pub fn pack_opaque_flex<Out: Write>(
+    val: &[u8],
+    maxsz: Option<usize>,
+    out: &mut Out,
+) -> Result<usize> {
     if maxsz.map_or(false, |m| val.len() > m) {
         bail!(ErrorKind::InvalidLen(maxsz.unwrap()));
     }
@@ -163,8 +182,15 @@ pub fn pack_string<Out: Write>(val: &str, maxsz: Option<usize>, out: &mut Out) -
 ///
 /// If the provided array is too large and there is no default, then decoding fails with an `InvalidLen` error.
 /// All the elements in `array` will be initialized after a successful return.
-pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl: Option<&T>) -> Result<usize>
-    where In: Read, T: Unpack<In> + Clone
+pub fn unpack_array<In, T>(
+    input: &mut In,
+    array: &mut [T],
+    arraysz: usize,
+    defl: Option<&T>,
+) -> Result<usize>
+where
+    In: Read,
+    T: Unpack<In> + Clone,
 {
     let mut rsz = 0;
     let sz = min(arraysz, array.len());
@@ -205,7 +231,11 @@ pub fn unpack_array<In, T>(input: &mut In, array: &mut [T], arraysz: usize, defl
 /// if it is too small, the excess elements are discarded.
 ///
 /// All the bytes in `bytes` will be initialized after a successful call.
-pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: usize) -> Result<usize> {
+pub fn unpack_opaque_array<In: Read>(
+    input: &mut In,
+    bytes: &mut [u8],
+    bytesz: usize,
+) -> Result<usize> {
     let sz = min(bytesz, bytes.len());
     let mut rsz = 0;
 
@@ -234,7 +264,10 @@ pub fn unpack_opaque_array<In: Read>(input: &mut In, bytes: &mut [u8], bytesz: u
 }
 
 /// Unpack a (perhaps) length-limited array
-pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>) -> Result<(Vec<T>, usize)> {
+pub fn unpack_flex<In: Read, T: Unpack<In>>(
+    input: &mut In,
+    maxsz: Option<usize>,
+) -> Result<(Vec<T>, usize)> {
     let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
@@ -261,7 +294,10 @@ pub fn unpack_flex<In: Read, T: Unpack<In>>(input: &mut In, maxsz: Option<usize>
 /// Unpack a (perhaps) length-limited opaque array
 ///
 /// Unpack an XDR encoded array of bytes, with an optional maximum length.
-pub fn unpack_opaque_flex<In: Read>(input: &mut In, maxsz: Option<usize>) -> Result<(Vec<u8>, usize)> {
+pub fn unpack_opaque_flex<In: Read>(
+    input: &mut In,
+    maxsz: Option<usize>,
+) -> Result<(Vec<u8>, usize)> {
     let (elems, mut sz) = Unpack::unpack(input)?;
 
     if maxsz.map_or(false, |m| elems > m) {
@@ -306,7 +342,9 @@ pub trait Pack<Out: Write> {
 impl<Out: Write> Pack<Out> for u8 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_u32::<BigEndian>(*self as u32).map_err(Error::from).map(|_| 4)
+        out.write_u32::<BigEndian>(*self as u32)
+            .map_err(Error::from)
+            .map(|_| 4)
     }
 }
 
@@ -314,49 +352,63 @@ impl<Out: Write> Pack<Out> for u8 {
 impl<Out: Write> Pack<Out> for i8 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_i32::<BigEndian>(*self as i32).map_err(Error::from).map(|_| 4)
+        out.write_i32::<BigEndian>(*self as i32)
+            .map_err(Error::from)
+            .map(|_| 4)
     }
 }
 
 impl<Out: Write> Pack<Out> for u32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_u32::<BigEndian>(*self).map_err(Error::from).map(|_| 4)
+        out.write_u32::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 4,
+        )
     }
 }
 
 impl<Out: Write> Pack<Out> for i32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_i32::<BigEndian>(*self).map_err(Error::from).map(|_| 4)
+        out.write_i32::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 4,
+        )
     }
 }
 
 impl<Out: Write> Pack<Out> for u64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_u64::<BigEndian>(*self).map_err(Error::from).map(|_| 8)
+        out.write_u64::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 8,
+        )
     }
 }
 
 impl<Out: Write> Pack<Out> for i64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_i64::<BigEndian>(*self).map_err(Error::from).map(|_| 8)
+        out.write_i64::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 8,
+        )
     }
 }
 
 impl<Out: Write> Pack<Out> for f32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_f32::<BigEndian>(*self).map_err(Error::from).map(|_| 4)
+        out.write_f32::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 4,
+        )
     }
 }
 
 impl<Out: Write> Pack<Out> for f64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_f64::<BigEndian>(*self).map_err(Error::from).map(|_| 8)
+        out.write_f64::<BigEndian>(*self).map_err(Error::from).map(
+            |_| 8,
+        )
     }
 }
 
@@ -417,7 +469,7 @@ impl<'a, Out: Write> Pack<Out> for Opaque<'a> {
         let data: &[u8] = self.0.borrow();
 
         if data.len() > u32::max_value() as usize {
-            return Err(ErrorKind::InvalidLen(data.len()).into())
+            return Err(ErrorKind::InvalidLen(data.len()).into());
         }
 
         sz = data.len().pack(out)?;
@@ -462,7 +514,8 @@ impl<Out: Write, T: Pack<Out>> Pack<Out> for Box<T> {
 }
 
 impl<'a, Out: Write, T> Pack<Out> for Cow<'a, T>
-    where T: 'a + Pack<Out> + ToOwned<Owned=T>
+where
+    T: 'a + Pack<Out> + ToOwned<Owned = T>,
 {
     fn pack(&self, out: &mut Out) -> Result<usize> {
         let t: &T = self.borrow();
@@ -497,7 +550,11 @@ pub trait Unpack<In: Read>: Sized {
 impl<In: Read> Unpack<In> for u8 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u32::<BigEndian>().map_err(Error::from).map(|v| (v as u8, 4))
+        input.read_u32::<BigEndian>().map_err(Error::from).map(
+            |v| {
+                (v as u8, 4)
+            },
+        )
     }
 }
 
@@ -505,60 +562,74 @@ impl<In: Read> Unpack<In> for u8 {
 impl<In: Read> Unpack<In> for i8 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i32::<BigEndian>().map_err(Error::from).map(|v| (v as i8, 4))
+        input.read_i32::<BigEndian>().map_err(Error::from).map(
+            |v| {
+                (v as i8, 4)
+            },
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for u32 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u32::<BigEndian>().map_err(Error::from).map(|v| (v, 4))
+        input.read_u32::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 4),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for i32 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i32::<BigEndian>().map_err(Error::from).map(|v| (v, 4))
+        input.read_i32::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 4),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for u64 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u64::<BigEndian>().map_err(Error::from).map(|v| (v, 8))
+        input.read_u64::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 8),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for i64 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i64::<BigEndian>().map_err(Error::from).map(|v| (v, 8))
+        input.read_i64::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 8),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for f32 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_f32::<BigEndian>().map_err(Error::from).map(|v| (v, 4))
+        input.read_f32::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 4),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for f64 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_f64::<BigEndian>().map_err(Error::from).map(|v| (v, 8))
+        input.read_f64::<BigEndian>().map_err(Error::from).map(
+            |v| (v, 8),
+        )
     }
 }
 
 impl<In: Read> Unpack<In> for bool {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        i32::unpack(input)
-            .and_then(|(v, sz)|
-                      match v {
-                          0 => Ok((false, sz)),
-                          1 => Ok((true, sz)),
-                          v => Err(ErrorKind::InvalidEnum(v).into()),
-                      })
+        i32::unpack(input).and_then(|(v, sz)| match v {
+            0 => Ok((false, sz)),
+            1 => Ok((true, sz)),
+            v => Err(ErrorKind::InvalidEnum(v).into()),
+        })
     }
 }
 
@@ -627,7 +698,8 @@ impl<In: Read, T: Unpack<In>> Unpack<In> for Box<T> {
 }
 
 impl<'a, In: Read, T> Unpack<In> for Cow<'a, T>
-    where T: 'a + Unpack<In> + ToOwned<Owned=T>
+where
+    T: 'a + Unpack<In> + ToOwned<Owned = T>,
 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
         let (b, sz) = Unpack::unpack(input)?;

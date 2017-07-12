@@ -12,12 +12,12 @@
 //!
 //! There's no magic number or other way to determine whether a stream
 //! is using record marking; both ends must agree.
-use std::io::{self, Read, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::cmp::min;
 
 use error::*;
 
-use super::{unpack, pack, Error};
+use super::{Error, pack, unpack};
 
 const LAST_REC: u32 = 1u32 << 31;
 
@@ -36,11 +36,11 @@ fn mapioerr(xdrerr: Error) -> io::Error {
 /// determine record ends.
 #[derive(Debug)]
 pub struct XdrRecordReader<R: BufRead> {
-    size: usize,                // record size
-    consumed: usize,            // bytes consumed
-    eor: bool,                  // is last record
+    size: usize, // record size
+    consumed: usize, // bytes consumed
+    eor: bool, // is last record
 
-    reader: R,                  // reader
+    reader: R, // reader
 }
 
 impl<R: BufRead> XdrRecordReader<R> {
@@ -51,7 +51,7 @@ impl<R: BufRead> XdrRecordReader<R> {
             size: 0,
             consumed: 0,
             eor: false,
-            reader: rd
+            reader: rd,
         }
     }
 
@@ -59,14 +59,12 @@ impl<R: BufRead> XdrRecordReader<R> {
     fn nextrec(&mut self) -> io::Result<bool> {
         assert_eq!(self.consumed, self.size);
 
-        let rechdr: u32 =
-            match unpack(&mut self.reader) {
-                Ok(v) => v,
-                Err(Error(ErrorKind::IOError(ref err), _)) if err.kind() == io::ErrorKind::UnexpectedEof =>
-                    return Ok(true),
-                Err(e) =>
-                    return Err(mapioerr(e)),
-            };
+        let rechdr: u32 = match unpack(&mut self.reader) {
+            Ok(v) => v,
+            Err(Error(ErrorKind::IOError(ref err), _))
+                if err.kind() == io::ErrorKind::UnexpectedEof => return Ok(true),
+            Err(e) => return Err(mapioerr(e)),
+        };
 
         self.size = (rechdr & !LAST_REC) as usize;
         self.consumed = 0;
@@ -75,7 +73,9 @@ impl<R: BufRead> XdrRecordReader<R> {
         Ok(false)
     }
 
-    fn totremains(&self) -> usize { self.size - self.consumed }
+    fn totremains(&self) -> usize {
+        self.size - self.consumed
+    }
 
     /// Current fragment is the end of the record.
     pub fn eor(&self) -> bool {
@@ -101,7 +101,7 @@ impl<R: BufRead> BufRead for XdrRecordReader<R> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         while self.totremains() == 0 {
             if self.nextrec()? {
-                return Ok(&[])
+                return Ok(&[]);
             }
         }
 
@@ -121,7 +121,9 @@ impl<R: BufRead> IntoIterator for XdrRecordReader<R> {
     type Item = io::Result<Vec<u8>>;
     type IntoIter = XdrRecordReaderIter<R>;
 
-    fn into_iter(self) -> Self::IntoIter { XdrRecordReaderIter(Some(self)) }
+    fn into_iter(self) -> Self::IntoIter {
+        XdrRecordReaderIter(Some(self))
+    }
 }
 
 /// Iterator over records in the stream.
@@ -164,7 +166,9 @@ impl<R: BufRead> Iterator for XdrRecordReaderIter<R> {
                     Err(e) => return Some(Err(e)),  // error
                 };
 
-                if eor { break }
+                if eor {
+                    break;
+                }
             }
             self.0 = Some(rr);
             Some(Ok(buf))
@@ -180,10 +184,10 @@ const WRBUF: usize = 65536;
 ///
 /// Flushes the current buffer as end of record when destroyed.
 pub struct XdrRecordWriter<W: Write> {
-    buf: Vec<u8>,   // accumulated record fragment
-    bufsz: usize,   // max fragment size
-    eor: bool,      // last fragment was eor
-    writer: W,      // writer we're passing on to
+    buf: Vec<u8>, // accumulated record fragment
+    bufsz: usize, // max fragment size
+    eor: bool, // last fragment was eor
+    writer: W, // writer we're passing on to
 }
 
 impl<W: Write> XdrRecordWriter<W> {
@@ -196,19 +200,23 @@ impl<W: Write> XdrRecordWriter<W> {
     /// Create an instance with a specific buffer size. Panics if the
     /// size is zero.
     pub fn with_buffer(w: W, bufsz: usize) -> XdrRecordWriter<W> {
-        if bufsz == 0 { panic!("bufsz must be non-zero") }
+        if bufsz == 0 {
+            panic!("bufsz must be non-zero")
+        }
         XdrRecordWriter {
             buf: Vec::with_capacity(bufsz),
             bufsz: bufsz,
             eor: false,
-            writer: w
+            writer: w,
         }
     }
 
     /// Flush the current buffer. If `eor` is true, the end of record
     /// marker is set.
     pub fn flush_eor(&mut self, eor: bool) -> io::Result<()> {
-        if !eor && self.buf.len() == 0 { return Ok(()) }
+        if !eor && self.buf.len() == 0 {
+            return Ok(());
+        }
 
         let rechdr = self.buf.len() as u32 | (if eor { LAST_REC } else { 0 });
 
@@ -234,7 +242,7 @@ impl<W: Write> Write for XdrRecordWriter<W> {
         let mut off = 0;
 
         while off < buf.len() {
-            let chunk = &buf[off..off+min(buf.len() - off, self.bufsz)];
+            let chunk = &buf[off..off + min(buf.len() - off, self.bufsz)];
             if self.buf.len() + chunk.len() > self.bufsz {
                 self.flush()?;
             }

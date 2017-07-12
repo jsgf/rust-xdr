@@ -5,12 +5,14 @@ use std::io::Cursor;
 use std::fmt::Debug;
 use std::iter;
 
-use xdr_codec::{Pack, Unpack, Error, ErrorKind, padding, pack_array, unpack_array, pack_opaque_array, unpack_opaque_array};
-use quickcheck::{quickcheck, Arbitrary};
+use xdr_codec::{Error, ErrorKind, Pack, Unpack, pack_array, pack_opaque_array, padding,
+                unpack_array, unpack_opaque_array};
+use quickcheck::{Arbitrary, quickcheck};
 
 // Output of packing is a multiple of 4
 fn pack<T>(v: T) -> bool
-    where T: PartialEq + Pack<Cursor<Vec<u8>>>
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>>,
 {
     let mut data = Cursor::new(Vec::new());
 
@@ -20,8 +22,9 @@ fn pack<T>(v: T) -> bool
 
 // Packing something then unpacking returns the same value
 fn codec<T>(v: T) -> bool
-    where T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>>
- {
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>>,
+{
     let mut data = Cursor::new(Vec::new());
 
     let psz = v.pack(&mut data).expect("pack failed");
@@ -34,8 +37,9 @@ fn codec<T>(v: T) -> bool
 
 // Packing something then unpacking returns the same value
 fn short_unpack<T>(v: T) -> bool
-    where T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>>
- {
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>>,
+{
     let mut data = Cursor::new(Vec::new());
 
     let psz = v.pack(&mut data).expect("pack failed");
@@ -43,7 +47,7 @@ fn short_unpack<T>(v: T) -> bool
     // truncate data to make sure unpacking fails
     let data = data.into_inner();
     assert_eq!(psz, data.len());
-    let data = Vec::from(&data[..data.len()-1]);
+    let data = Vec::from(&data[..data.len() - 1]);
 
     let mut data = Cursor::new(data);
     match T::unpack(&mut data) {
@@ -53,7 +57,8 @@ fn short_unpack<T>(v: T) -> bool
 }
 
 fn quickcheck_pack_t<T>()
-    where T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug,
 {
     quickcheck(pack as fn(T) -> bool);
     quickcheck(pack as fn(Vec<T>) -> bool);
@@ -63,7 +68,8 @@ fn quickcheck_pack_t<T>()
 }
 
 fn quickcheck_codec_t<T>()
-    where T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug,
 {
     quickcheck(codec as fn(T) -> bool);
     quickcheck(codec as fn(Vec<T>) -> bool);
@@ -73,7 +79,8 @@ fn quickcheck_codec_t<T>()
 }
 
 fn quickcheck_short_unpack_t<T>()
-    where T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug
+where
+    T: PartialEq + Pack<Cursor<Vec<u8>>> + Unpack<Cursor<Vec<u8>>> + Arbitrary + Debug,
 {
     quickcheck(short_unpack as fn(T) -> bool);
     quickcheck(short_unpack as fn(Vec<T>) -> bool);
@@ -145,22 +152,42 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
     // pack data we have into the array
     let tsz = match pack_array(&data[..], arraysz, &mut buf, defl.as_ref()) {
         Ok(tsz) if data.len() >= arraysz || defl.is_some() => tsz,
-        e@Err(Error(ErrorKind::InvalidLen(_), _)) => {
+        e @ Err(Error(ErrorKind::InvalidLen(_), _)) => {
             let pass = defl.is_none() && data.len() < arraysz;
-            if !pass { println!("pack_array failed {:?}, defl {:?} data.len {} arraysz {}", e, defl, data.len(), arraysz) }
-            return pass
-        },
+            if !pass {
+                println!(
+                    "pack_array failed {:?}, defl {:?} data.len {} arraysz {}",
+                    e,
+                    defl,
+                    data.len(),
+                    arraysz
+                )
+            }
+            return pass;
+        }
         Err(e) => {
             println!("pack_array failed {:?}", e);
-            return false
-        },
+            return false;
+        }
         Ok(tsz) => {
-            println!("pack_array unexpected success tsz {} data.len {} arraysz {} defl {:?}", tsz, data.len(), arraysz, defl);
+            println!(
+                "pack_array unexpected success tsz {} data.len {} arraysz {} defl {:?}",
+                tsz,
+                data.len(),
+                arraysz,
+                defl
+            );
             return false;
         }
     };
-    if tsz != arraysz * 4 { println!("tsz {} arraysz*4 {}", tsz, arraysz*4); return false }
-    if buf.len() != tsz { println!("buf.len {} tsz {}", buf.len(), tsz); return false }
+    if tsz != arraysz * 4 {
+        println!("tsz {} arraysz*4 {}", tsz, arraysz * 4);
+        return false;
+    }
+    if buf.len() != tsz {
+        println!("buf.len {} tsz {}", buf.len(), tsz);
+        return false;
+    }
 
     // if data is shorter than array, then serialized is padded with zero
     // XXX padding isn't necessarily zero
@@ -175,26 +202,43 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
     // unpack rxsize elements
     let rsz = match unpack_array(&mut cur, &mut recv[..], arraysz, defl.as_ref()) {
         Ok(rsz) if recv.len() <= arraysz || defl.is_some() => rsz,                  // normal success
-        Err(Error(ErrorKind::InvalidLen(_), _)) =>
-            return defl.is_none() && recv.len() > arraysz,    // expected if recv is too big and there's no default
+        Err(Error(ErrorKind::InvalidLen(_), _)) => return defl.is_none() && recv.len() > arraysz,    // expected if recv is too big and there's no default
         Err(e) => {
             println!("unpack_array failed {:?}", e);
             return false;
-        },
+        }
         Ok(rsz) => {
-            println!("unpack_array unexpected success rsz {} recv.len {} arraysz {} defl {:?}", rsz, recv.len(), arraysz, defl);
+            println!(
+                "unpack_array unexpected success rsz {} recv.len {} arraysz {} defl {:?}",
+                rsz,
+                recv.len(),
+                arraysz,
+                defl
+            );
             return false;
-        },
+        }
     };
-    if rsz != arraysz * 4 { println!("rsz {} arraysz*4 {}", rsz, arraysz*4); return false }
+    if rsz != arraysz * 4 {
+        println!("rsz {} arraysz*4 {}", rsz, arraysz * 4);
+        return false;
+    }
 
     // data and recv must match their common prefix up to arraysz
-    if data.iter().zip(recv.iter().take(arraysz)).any(|(d, r)| *d != *r) { println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv); return false }
+    if data.iter().zip(recv.iter().take(arraysz)).any(
+        |(d, r)| *d != *r,
+    )
+    {
+        println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv);
+        return false;
+    }
 
     // if recv is larger than array, then tail is defaulted
     if rxsize > arraysz {
         assert!(defl.is_some());
-        if recv[arraysz..].iter().any(|v| *v != defl.unwrap()) { println!("nondefault tail"); return false }
+        if recv[arraysz..].iter().any(|v| *v != defl.unwrap()) {
+            println!("nondefault tail");
+            return false;
+        }
     }
 
     true
@@ -202,7 +246,9 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
 
 #[test]
 fn quickcheck_array() {
-    quickcheck(check_array as fn(usize, usize, Vec<u32>, Option<u32>) -> bool);
+    quickcheck(
+        check_array as fn(usize, usize, Vec<u32>, Option<u32>) -> bool,
+    );
 }
 
 fn check_opaque(arraysz: usize, rxsize: usize, data: Vec<u8>) -> bool {
@@ -210,12 +256,25 @@ fn check_opaque(arraysz: usize, rxsize: usize, data: Vec<u8>) -> bool {
 
     // pack data we have into the array
     let tsz = pack_opaque_array(&data[..], arraysz, &mut buf).expect("pack_array failed");
-    if tsz != arraysz + padding(arraysz).len() { println!("tsz {} arraysz+pad {}", tsz, arraysz+padding(arraysz).len()); return false }
-    if buf.len() != tsz { println!("buf.len {} tsz {}", buf.len(), tsz); return false }
+    if tsz != arraysz + padding(arraysz).len() {
+        println!(
+            "tsz {} arraysz+pad {}",
+            tsz,
+            arraysz + padding(arraysz).len()
+        );
+        return false;
+    }
+    if buf.len() != tsz {
+        println!("buf.len {} tsz {}", buf.len(), tsz);
+        return false;
+    }
 
     // if data is shorter than array, then serialized is padded with zero
     if data.len() < arraysz {
-        if buf[data.len()..].iter().any(|b| *b != 0) { println!("nonzero pad"); return false }
+        if buf[data.len()..].iter().any(|b| *b != 0) {
+            println!("nonzero pad");
+            return false;
+        }
     }
 
     let mut recv: Vec<u8> = iter::repeat(0xff).take(rxsize).collect();
@@ -223,14 +282,30 @@ fn check_opaque(arraysz: usize, rxsize: usize, data: Vec<u8>) -> bool {
 
     // unpack rxsize elements
     let rsz = unpack_opaque_array(&mut cur, &mut recv[..], arraysz).expect("unpack_array failed");
-    if rsz != arraysz+padding(arraysz).len() { println!("rsz {} arraysz+pad {}", rsz, arraysz+padding(arraysz).len()); return false }
+    if rsz != arraysz + padding(arraysz).len() {
+        println!(
+            "rsz {} arraysz+pad {}",
+            rsz,
+            arraysz + padding(arraysz).len()
+        );
+        return false;
+    }
 
     // data and recv must match their common prefix up to arraysz
-    if data.iter().zip(recv.iter().take(arraysz)).any(|(d, r)| *d != *r) { println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv); return false }
+    if data.iter().zip(recv.iter().take(arraysz)).any(
+        |(d, r)| *d != *r,
+    )
+    {
+        println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv);
+        return false;
+    }
 
     // if recv is larger than array, then tail is zero
     if rxsize > arraysz {
-        if recv[arraysz..].iter().any(|v| *v != 0) { println!("nondefault tail"); return false }
+        if recv[arraysz..].iter().any(|v| *v != 0) {
+            println!("nondefault tail");
+            return false;
+        }
     }
 
     true

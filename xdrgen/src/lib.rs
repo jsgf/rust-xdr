@@ -33,7 +33,7 @@ use std::result;
 use xdr::Result;
 
 mod spec;
-use spec::{Symtab, Emit, Emitpack};
+use spec::{Emit, Emitpack, Symtab};
 
 fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::Result<T, E>> {
     match resopt {
@@ -48,8 +48,9 @@ fn result_option<T, E>(resopt: result::Result<Option<T>, E>) -> Option<result::R
 /// `infile` is simply a string used in error messages; it may be empty. `input` is a read stream of
 /// the specification, and `output` is where the generated code is sent.
 pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result<()>
-    where In: Read,
-          Out: Write
+where
+    In: Read,
+    Out: Write,
 {
     let mut source = String::new();
 
@@ -64,12 +65,10 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 
     let res: Vec<_> = {
         let consts = xdr.constants()
-            .filter_map(|(c, &(v, ref scope))| {
-                if scope.is_none() {
-                    Some(spec::Const(c.clone(), v))
-                } else {
-                    None
-                }
+            .filter_map(|(c, &(v, ref scope))| if scope.is_none() {
+                Some(spec::Const(c.clone(), v))
+            } else {
+                None
             })
             .map(|c| c.define(&xdr));
 
@@ -89,15 +88,17 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
             .map(|(n, ty)| spec::Typespec(n.clone(), ty.clone()))
             .filter_map(|c| result_option(c.unpack(&xdr)));
 
-        consts.chain(typespecs)
+        consts
+            .chain(typespecs)
             .chain(typesyns)
             .chain(packers)
             .chain(unpackers)
             .collect::<Result<Vec<_>>>()?
     };
 
-    let _ = writeln!(output,
-                     r#"
+    let _ = writeln!(
+        output,
+        r#"
 // GENERATED CODE
 //
 // Generated from {} by xdrgen.
@@ -105,7 +106,8 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 // DO NOT EDIT
 
 "#,
-                     infile);
+        infile
+    );
 
     for it in res {
         let _ = writeln!(output, "{}\n", it.as_str());
@@ -139,7 +141,8 @@ pub fn generate<In, Out>(infile: &str, mut input: In, mut output: Out) -> Result
 /// If your specification uses types which are not within the specification, you can provide your
 /// own implementations of `Pack` and `Unpack` for them.
 pub fn compile<P>(infile: P) -> Result<()>
-    where P: AsRef<Path> + Display
+where
+    P: AsRef<Path> + Display,
 {
     let input = File::open(&infile)?;
 
@@ -156,7 +159,9 @@ pub fn compile<P>(infile: P) -> Result<()>
 
     let output = File::create(outdir)?;
 
-    generate(infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"),
-             input,
-             output)
+    generate(
+        infile.as_ref().as_os_str().to_str().unwrap_or("<unknown>"),
+        input,
+        output,
+    )
 }

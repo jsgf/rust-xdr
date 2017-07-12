@@ -6,7 +6,7 @@ extern crate clap;
 
 use std::fs::File;
 use std::io::{BufReader, Write};
-use std::io::{stdin, stdout, stderr};
+use std::io::{stderr, stdin, stdout};
 
 use clap::App;
 

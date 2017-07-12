@@ -3,7 +3,7 @@ extern crate xdr_codec;
 
 use std::io::{Cursor, Write};
 
-use quickcheck::{quickcheck, TestResult};
+use quickcheck::{TestResult, quickcheck};
 
 use xdr_codec::Pack;
 use xdr_codec::record::{XdrRecordReader, XdrRecordWriter};
@@ -12,7 +12,9 @@ use xdr_codec::record::{XdrRecordReader, XdrRecordWriter};
 fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {
     const EOR: u32 = 1 << 31;
 
-    if bufsz == 0 { return TestResult::discard() }
+    if bufsz == 0 {
+        return TestResult::discard();
+    }
 
     // Make an expected serialization into fragments
     let mut expected = Vec::new();
@@ -20,7 +22,9 @@ fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {
 
     for (idx, c) in bytes.chunks(bufsz).enumerate() {
         let mut len = c.len() as u32;
-        if nchunks-1 == idx && eor { len |= EOR; }
+        if nchunks - 1 == idx && eor {
+            len |= EOR;
+        }
 
         if let Err(e) = len.pack(&mut expected) {
             return TestResult::error(format!("pack failed: {:?}", e));
@@ -46,7 +50,13 @@ fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {
     }
 
     if buf != expected {
-        println!("eor {} bufsz {} bytes {:?} len {}", eor, bufsz, bytes, bytes.len());
+        println!(
+            "eor {} bufsz {} bytes {:?} len {}",
+            eor,
+            bufsz,
+            bytes,
+            bytes.len()
+        );
         println!("expected {:?} len {}", expected, expected.len());
         println!("     buf {:?} len {}", buf, buf.len());
     }
@@ -56,13 +66,13 @@ fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {
 
 #[test]
 fn record_writerec() {
-    quickcheck(check_writerec as fn (usize, bool, Vec<u8>) -> TestResult);
+    quickcheck(check_writerec as fn(usize, bool, Vec<u8>) -> TestResult);
 }
 
 // Make sure record structure survives a round trip
 fn check_codec(bufsz: usize, ref records: Vec<Vec<u8>>) -> TestResult {
     if bufsz == 0 {
-        return TestResult::discard()
+        return TestResult::discard();
     }
 
     let mut buf = Vec::new();
@@ -82,11 +92,18 @@ fn check_codec(bufsz: usize, ref records: Vec<Vec<u8>>) -> TestResult {
         for (res, orig) in xr.into_iter().zip(records) {
             match res {
                 Err(e) => return TestResult::error(format!("xr failed {:?}", e)),
-                Ok(ref rx) => if rx != orig {
-                    println!("bufsz {} mismatch orig {:?}, len {}", bufsz, orig, orig.len());
-                    println!("                    rx {:?}, len {}", rx, rx.len());
-                    return TestResult::failed()
-                },
+                Ok(ref rx) => {
+                    if rx != orig {
+                        println!(
+                            "bufsz {} mismatch orig {:?}, len {}",
+                            bufsz,
+                            orig,
+                            orig.len()
+                        );
+                        println!("                    rx {:?}, len {}", rx, rx.len());
+                        return TestResult::failed();
+                    }
+                }
             }
         }
     }
@@ -96,5 +113,5 @@ fn check_codec(bufsz: usize, ref records: Vec<Vec<u8>>) -> TestResult {
 
 #[test]
 fn record_codec() {
-    quickcheck(check_codec as fn (usize, Vec<Vec<u8>>) -> TestResult);
+    quickcheck(check_codec as fn(usize, Vec<Vec<u8>>) -> TestResult);
 }

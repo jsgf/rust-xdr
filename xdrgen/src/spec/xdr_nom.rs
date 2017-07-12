@@ -1,11 +1,11 @@
 // Grammar for a .x file specifying XDR type codecs. Does not include any RPC syntax. Should match RFC4506.
-use nom::{self, Err, IResult, Needed, ErrorKind, not_line_ending, is_digit, is_space, AsBytes};
+use nom::{self, AsBytes, Err, ErrorKind, IResult, Needed, is_digit, is_space, not_line_ending};
 use nom::IResult::*;
 
 use std::str;
 
-use super::{Value, Type, Decl, Defn, EnumDefn, UnionCase};
-use super::{COPY, CLONE, EQ, PARTIALEQ, DEBUG};
+use super::{Decl, Defn, EnumDefn, Type, UnionCase, Value};
+use super::{CLONE, COPY, DEBUG, EQ, PARTIALEQ};
 
 #[inline]
 fn ignore<T>(_: T) -> () {
@@ -21,9 +21,11 @@ pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
     match spec(input.as_bytes()) {
         Done(_, spec) => Ok(spec),
         Error(Err::Position(kind, input)) => {
-            Err(format!("{:?}: {}",
-                        kind,
-                        String::from(str::from_utf8(input).unwrap())))
+            Err(format!(
+                "{:?}: {}",
+                kind,
+                String::from(str::from_utf8(input).unwrap())
+            ))
         }
         Error(err) => Err(format!("Error: {:?}", err)),
         Incomplete(need) => Err(format!("Incomplete {:?}", need)),
@@ -200,7 +202,7 @@ macro_rules! kw {
 
 kw!(kw_bool, b"bool");
 kw!(kw_case, b"case");
-kw!(kw_char, b"char");          // special case - part time keyword
+kw!(kw_char, b"char"); // special case - part time keyword
 kw!(kw_const, b"const");
 kw!(kw_default, b"default");
 kw!(kw_double, b"double");
@@ -208,10 +210,10 @@ kw!(kw_enum, b"enum");
 kw!(kw_float, b"float");
 kw!(kw_hyper, b"hyper");
 kw!(kw_int, b"int");
-kw!(kw_long, b"long");          // special case - part time keyword
+kw!(kw_long, b"long"); // special case - part time keyword
 kw!(kw_opaque, b"opaque");
 kw!(kw_quadruple, b"quadruple");
-kw!(kw_short, b"short");        // special case - part time keyword
+kw!(kw_short, b"short"); // special case - part time keyword
 kw!(kw_string, b"string");
 kw!(kw_struct, b"struct");
 kw!(kw_switch, b"switch");

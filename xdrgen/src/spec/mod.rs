@@ -1,10 +1,10 @@
 use std::collections::btree_map::{BTreeMap, Iter};
-use std::collections::{HashSet, HashMap};
-use std::io::{stderr, Write};
+use std::collections::{HashMap, HashSet};
+use std::io::{Write, stderr};
 
 use std::result;
 
-use quote::{self, Tokens, ToTokens};
+use quote::{self, ToTokens, Tokens};
 
 mod xdr_nom;
 
@@ -28,17 +28,29 @@ bitflags! {
 
 impl ToTokens for Derives {
     fn to_tokens(&self, toks: &mut Tokens) {
-        if self.is_empty() { return; }
+        if self.is_empty() {
+            return;
+        }
 
         toks.append("#[derive(");
 
         let mut der = Vec::new();
 
-        if self.contains(COPY) { der.push(quote!(Copy)) }
-        if self.contains(CLONE) { der.push(quote!(Clone)) }
-        if self.contains(DEBUG) { der.push(quote!(Debug)) }
-        if self.contains(EQ) { der.push(quote!(Eq)) }
-        if self.contains(PARTIALEQ) { der.push(quote!(PartialEq)) }
+        if self.contains(COPY) {
+            der.push(quote!(Copy))
+        }
+        if self.contains(CLONE) {
+            der.push(quote!(Clone))
+        }
+        if self.contains(DEBUG) {
+            der.push(quote!(Debug))
+        }
+        if self.contains(EQ) {
+            der.push(quote!(Eq))
+        }
+        if self.contains(PARTIALEQ) {
+            der.push(quote!(PartialEq))
+        }
 
         toks.append_separated(der, ",");
         toks.append(")]");
@@ -90,9 +102,11 @@ impl Value {
         match self {
             &Value::Ident(ref id) => quote_ident(id),
             &Value::Const(val) => {
-                quote::Ident::new(format!("Const{}{}",
-                                                (if val < 0 { "_" } else { "" }),
-                                                val.abs()))
+                quote::Ident::new(format!(
+                    "Const{}{}",
+                    (if val < 0 { "_" } else { "" }),
+                    val.abs()
+                ))
             }
         }
     }
@@ -238,11 +252,20 @@ impl Type {
             }
             &Enum(_) => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
             &Option(ref ty) => ty.derivable(symtab, Some(memo)),
-            &Struct(ref fields) => fields.iter().fold(Derives::all(), |a, f| a & f.derivable(symtab, memo)),
+            &Struct(ref fields) => {
+                fields.iter().fold(Derives::all(), |a, f| {
+                    a & f.derivable(symtab, memo)
+                })
+            }
 
             &Union(_, ref cases, ref defl) => {
-                cases.iter().map(|c| &c.1).fold(Derives::all(), |a, c| a & c.derivable(symtab, memo)) &
-                defl.as_ref().map_or(Derives::all(), |d| d.derivable(symtab, memo))
+                cases.iter().map(|c| &c.1).fold(Derives::all(), |a, c| {
+                    a & c.derivable(symtab, memo)
+                }) &
+                    defl.as_ref().map_or(
+                        Derives::all(),
+                        |d| d.derivable(symtab, memo),
+                    )
             }
 
             &Ident(_, Some(derives)) => derives,
@@ -323,12 +346,13 @@ impl Type {
                 let value = value.as_token(symtab);
 
                 match ty {
-                    &Opaque | &String =>
+                    &Opaque | &String => {
                         quote!({
                             let mut buf: [u8; #value as usize] = unsafe { ::std::mem::uninitialized() };
                             let sz = xdr_codec::unpack_opaque_array(input, &mut buf[..], #value as usize)?;
                             (buf, sz)
-                        }),
+                        })
+                    }
                     ty => {
                         let ty = ty.as_token(symtab).unwrap();
                         quote!({
@@ -548,13 +572,14 @@ impl Emit for Typespec {
 
         let ret = match ty {
             &Enum(ref edefs) => {
-                let defs: Vec<_> = edefs.iter()
-                    .filter_map(|&EnumDefn(ref field, _)| {
-                        if let Some((val, Some(_))) = symtab.getconst(field) {
-                            Some((quote_ident(field), val as isize))
-                        } else {
-                            None
-                        }
+                let defs: Vec<_> = edefs
+                    .iter()
+                    .filter_map(|&EnumDefn(ref field, _)| if let Some((val, Some(_))) =
+                        symtab.getconst(field)
+                    {
+                        Some((quote_ident(field), val as isize))
+                    } else {
+                        None
                     })
                     .map(|(field, val)| quote!(#field = #val,))
                     .collect();
@@ -564,7 +589,8 @@ impl Emit for Typespec {
             }
 
             &Struct(ref decls) => {
-                let decls: Vec<_> = decls.iter()
+                let decls: Vec<_> = decls
+                    .iter()
                     .filter_map(|decl| result_option(decl.as_token(symtab)))
                     .map(|res| res.map(|(field, ty)| quote!(pub #field: #ty,)))
                     .collect::<Result<Vec<_>>>()?;
@@ -622,32 +648,34 @@ impl Emit for Typespec {
                     }
                 };
 
-                let mut cases: Vec<_> =
-                    cases.iter()
-                        .map(|&UnionCase(ref val, ref decl)| {
-                            if !compatcase(val) {
-                                return Err(Error::from(format!("incompat selector {:?} case {:?}", selector, val)));
-                            }
+                let mut cases: Vec<_> = cases
+                    .iter()
+                    .map(|&UnionCase(ref val, ref decl)| {
+                        if !compatcase(val) {
+                            return Err(Error::from(
+                                format!("incompat selector {:?} case {:?}", selector, val),
+                            ));
+                        }
 
-                            let label = val.as_ident();
+                        let label = val.as_ident();
 
-                            match decl {
-                                &Void => Ok(quote!(#label,)),
-                                &Named(ref name, ref ty) => {
-                                    let mut tok = ty.as_token(symtab)?;
-                                    if false && ty.is_boxed(symtab) {
-                                        tok = quote!(Box<#tok>)
-                                    };
-                                    if labelfields {
-                                        let name = quote_ident(name);
-                                        Ok(quote!(#label { #name : #tok },))
-                                    } else {
-                                        Ok(quote!(#label(#tok),))
-                                    }
+                        match decl {
+                            &Void => Ok(quote!(#label,)),
+                            &Named(ref name, ref ty) => {
+                                let mut tok = ty.as_token(symtab)?;
+                                if false && ty.is_boxed(symtab) {
+                                    tok = quote!(Box<#tok>)
+                                };
+                                if labelfields {
+                                    let name = quote_ident(name);
+                                    Ok(quote!(#label { #name : #tok },))
+                                } else {
+                                    Ok(quote!(#label(#tok),))
                                 }
                             }
-                        })
-                        .collect::<Result<Vec<_>>>()?;
+                        }
+                    })
+                    .collect::<Result<Vec<_>>>()?;
 
                 if let &Some(ref def_val) = defl {
                     let def_val = def_val.as_ref();
@@ -723,7 +751,8 @@ impl Emitpack for Typespec {
             }
 
             &Union(_, ref cases, ref defl) => {
-                let mut matches: Vec<_> = cases.iter()
+                let mut matches: Vec<_> = cases
+                    .iter()
                     .filter_map(|&UnionCase(ref val, ref decl)| {
                         let label = val.as_ident();
                         let disc = val.as_token(symtab);
@@ -745,15 +774,18 @@ impl Emitpack for Typespec {
                 if let &Some(ref decl) = defl {
                     let decl = decl.as_ref();
                     // Can't cast a value-carrying enum to i32
-                    let default =
-                        match decl {
-                            &Void => quote! {
+                    let default = match decl {
+                        &Void => {
+                            quote! {
                                 &#name::default => return Err(xdr_codec::Error::invalidcase(-1)),
-                            },
-                            &Named(_, _) => quote! {
+                            }
+                        }
+                        &Named(_, _) => {
+                            quote! {
                                 &#name::default(_) => return Err(xdr_codec::Error::invalidcase(-1)),
-                            },
-                        };
+                            }
+                        }
+                    };
 
                     matches.push(default)
                 }
@@ -829,7 +861,8 @@ impl Emitpack for Typespec {
             }
 
             &Struct(ref decls) => {
-                let decls: Vec<_> = decls.iter()
+                let decls: Vec<_> = decls
+                    .iter()
                     .filter_map(|decl| decl.name_as_ident())
                     .map(|(field, ty)| {
                         let unpack = ty.unpacker(symtab);

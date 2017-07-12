@@ -1,9 +1,10 @@
 extern crate xdrgen;
 extern crate xdr_codec;
 extern crate tempdir;
-#[macro_use] extern crate error_chain;
+#[macro_use]
+extern crate error_chain;
 
-use std::fs::{create_dir_all, File};
+use std::fs::{File, create_dir_all};
 use std::io::{Cursor, Write};
 use std::process::Command;
 
@@ -22,7 +23,8 @@ fn build_test(name: &str, xdr_spec: &str) -> Result<()> {
     let cargohome = dir.join(".cargo");
     let cargotoml = dir.join("Cargo.toml");
 
-    let toml = format!(r#"
+    let toml = format!(
+        r#"
 [package]
 name = "test"
 version = "0.0.0"
@@ -36,9 +38,14 @@ path = "{}"
 xdr-codec = {{ path = "{}" }}
 "#,
         mainfile.as_os_str().to_string_lossy(),
-        std::env::current_dir()?.join("../xdr-codec").as_os_str().to_string_lossy());
+        std::env::current_dir()?
+            .join("../xdr-codec")
+            .as_os_str()
+            .to_string_lossy()
+    );
 
-    let template = format!(r#"
+    let template = format!(
+        r#"
 #![allow(dead_code, non_camel_case_types, unused_assignments, unused_imports)]
 extern crate xdr_codec;
 
@@ -49,7 +56,8 @@ mod test {{
 
 fn main() {{}}
 "#,
-                           testfile.as_os_str().to_string_lossy());
+        testfile.as_os_str().to_string_lossy()
+    );
 
     {
         let mut main = File::create(&mainfile)?;
@@ -79,9 +87,11 @@ fn main() {{}}
         cmd.output()?
     };
 
-    println!("stdout: {}\n, stderr: {}",
-             String::from_utf8_lossy(&compile.stdout),
-             String::from_utf8_lossy(&compile.stderr));
+    println!(
+        "stdout: {}\n, stderr: {}",
+        String::from_utf8_lossy(&compile.stdout),
+        String::from_utf8_lossy(&compile.stderr)
+    );
 
     if compile.status.success() {
         Ok(())
@@ -155,7 +165,7 @@ fn simple() {
     let specs = vec![
         "struct foo { int bar; unsigned int blat; hyper foo; unsigned hyper hyperfoo; };",
         "const blop = 123;",
-        "typedef opaque Ioaddr<>;"
+        "typedef opaque Ioaddr<>;",
     ];
 
     for (i, spec) in specs.into_iter().enumerate() {
