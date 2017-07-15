@@ -23,7 +23,7 @@ unstable = []
 [dependencies]
 log = "0.3"
 env_logger = "0.4"
-nom = "1.2"
+nom = { version="3.1", features=["verbose-errors"] }
 quote = "0.3"
 clap = "2.24"
 lazy_static = "0.2"

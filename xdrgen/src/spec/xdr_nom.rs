@@ -1,5 +1,5 @@
 // Grammar for a .x file specifying XDR type codecs. Does not include any RPC syntax. Should match RFC4506.
-use nom::{self, AsBytes, Err, ErrorKind, IResult, Needed, is_digit, is_space, not_line_ending};
+use nom::{Err, ErrorKind, IResult, Needed, is_digit, is_space, not_line_ending};
 use nom::IResult::*;
 
 use std::str;
@@ -13,8 +13,16 @@ fn ignore<T>(_: T) -> () {
 }
 
 // Complete tag
-fn ctag<T: AsBytes>(input: &[u8], tag: T) -> IResult<&[u8], &[u8]> {
-    complete!(input, tag!(tag))
+fn ctag<T: AsRef<[u8]>>(input: &[u8], tag: T) -> IResult<&[u8], &[u8]> {
+    complete!(input, tag!(tag.as_ref()))
+}
+
+fn eof(input: &[u8]) -> IResult<&[u8], ()> {
+    if input.len() == 0 {
+        IResult::Done(input, ())
+    } else {
+        IResult::Error(Err::Position(ErrorKind::Eof, input))
+    }
 }
 
 pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
@@ -33,7 +41,12 @@ pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
 }
 
 named!(spec< Vec<Defn> >,
-       chain!(directive? ~ defns: many0!(definition) ~ spaces ~ eof, || defns));
+    do_parse!(
+        opt!(directive) >>
+        defns: many0!(definition) >>
+        spaces >> eof >>
+        (defns))
+);
 
 #[test]
 fn test_spec() {
@@ -114,16 +127,29 @@ named!(eq,      preceded!(spaces, apply!(ctag, "=")));
 named!(star,    preceded!(spaces, apply!(ctag, "*")));
 
 named!(hexnumber<i64>,
-       chain!(apply!(ctag, "0x") ~ val: map_res!(apply!(digit, is_hexdigit), str::from_utf8),
-              || { i64::from_str_radix(val, 16).unwrap() }));
+    do_parse!(
+        apply!(ctag, "0x") >>
+        val: map_res!(apply!(digit, is_hexdigit), str::from_utf8) >>
+        (i64::from_str_radix(val, 16).unwrap())
+    )
+);
 
 named!(octnumber<i64>,
-       chain!(sign: apply!(ctag, "-")? ~ apply!(ctag, "0") ~ val: opt!(map_res!(apply!(digit, is_octdigit), str::from_utf8)),
-              || { i64::from_str_radix(val.unwrap_or("0"), 8).unwrap() * (if sign.is_some() { -1 } else { 1 }) }));
+    do_parse!(
+        sign: opt!(apply!(ctag, "-")) >>
+        apply!(ctag, "0") >>
+        val: opt!(map_res!(apply!(digit, is_octdigit), str::from_utf8)) >>
+        (i64::from_str_radix(val.unwrap_or("0"), 8).unwrap() * (if sign.is_some() { -1 } else { 1 }))
+    )
+);
 
 named!(decnumber<i64>,
-       chain!(sign: apply!(ctag, "-")? ~ val: map_res!(apply!(digit, is_digit), str::from_utf8),
-              || { i64::from_str_radix(val, 10).unwrap() * (if sign.is_some() { -1 } else { 1 }) }));
+    do_parse!(
+        sign: opt!(apply!(ctag, "-")) >>
+        val: map_res!(apply!(digit, is_digit), str::from_utf8) >>
+        (i64::from_str_radix(val, 10).unwrap() * (if sign.is_some() { -1 } else { 1 }))
+    )
+);
 
 named!(number<i64>, preceded!(spaces, alt!(hexnumber | octnumber | decnumber)));
 
@@ -311,17 +337,27 @@ fn test_ident() {
     assert_eq!(ident(&b" bool "[..]), Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..])));
 }
 
-named!(blockcomment<()>, chain!(apply!(ctag, "/*") ~ take_until_and_consume!(&b"*/"[..]), || ()));
-
-named!(eof<()>, map!(nom::eof, ignore));
+named!(blockcomment<()>,
+    do_parse!(apply!(ctag, "/*") >> take_until_and_consume!(&b"*/"[..]) >> (())));
 
 // `linecomment`, and `directive` end at eol, but do not consume it
-named!(linecomment<()>, chain!(apply!(ctag, "//") ~ not_line_ending? ~ peek!(alt!(eol | eof)), || ()));
+named!(linecomment<()>,
+    do_parse!(
+        apply!(ctag, "//") >> opt!(not_line_ending) >> peek!(alt!(eol | eof)) >> (())
+    )
+);
 
 // Directive should always follow eol unless its the first thing in the file
 named!(directive<()>,
-       chain!(whitespace? ~ alt!(apply!(ctag, "#") | apply!(ctag, "%")) ~ not_line_ending? ~ peek!(alt!(eol | eof)),
-              || ()));
+    do_parse!(
+        opt!(whitespace) >>
+        alt!(
+            apply!(ctag, "#") | 
+            apply!(ctag, "%")) >>
+        opt!(not_line_ending) >>
+        peek!(alt!(eol | eof)) >> (())
+    )
+);
 
 #[test]
 fn test_comments() {
@@ -354,15 +390,17 @@ named!(whitespace<()>,
 // `spaces` consumes spans of space and tab characters interpolated
 // with comments, c-preproc and passthrough lines.
 named!(spaces<()>,
-       map!(
-           many0!(alt!( chain!(eol ~ directive?, || ())
-                           | whitespace
-                           | blockcomment
-                           | linecomment
-                           )
-                   ),
-           ignore)
-       );
+    map!(
+        many0!(
+            alt!( do_parse!(eol >> opt!(complete!(directive)) >> (()))
+                | whitespace
+                | blockcomment
+                | linecomment
+                )
+        ),
+        ignore
+    )
+);
 
 fn ws(input: &[u8]) -> &[u8] {
     match spaces(input) {
@@ -400,13 +438,21 @@ named!(enum_type_spec< Vec<EnumDefn> >,
        preceded!(kw_enum, enum_body));
 
 named!(enum_body< Vec<EnumDefn> >,
-       chain!(lbrace ~
-              b: separated_nonempty_list!(comma, enum_assign) ~
-              rbrace,
-              || { b }));
+    do_parse!(
+        lbrace >>
+        b: separated_nonempty_list!(comma, enum_assign) >>
+        rbrace >>
+        (b)
+    )
+);
 
 named!(enum_assign<EnumDefn>,
-       chain!(id: ident ~ v: preceded!(eq, value)?, || { EnumDefn::new(id, v) }));
+    do_parse!(
+        id: ident >>
+        v: opt!(preceded!(eq, value)) >>
+        (EnumDefn::new(id, v))
+    )
+);
 
 named!(value<Value>,
        alt!(number => { |c| Value::Const(c) } |
@@ -418,48 +464,60 @@ named!(struct_type_spec< Vec<Decl> >,
        preceded!(kw_struct, struct_body));
 
 named!(struct_body< Vec<Decl> >,
-       chain!(lbrace ~
-              decls: many1!(terminated!(declaration, semi)) ~
-              rbrace,
-              || decls));
+    do_parse!(
+        lbrace >>
+        decls: many1!(terminated!(declaration, semi)) >>
+        rbrace >>
+        (decls)
+    )
+);
 
 named!(union_type_spec<(Decl, Vec<UnionCase>, Option<Decl>)>,
-       chain!(kw_union ~ body:union_body, || body));
+    do_parse!(kw_union >> body:union_body >> (body)));
 
 named!(union_body<(Decl, Vec<UnionCase>, Option<Decl>)>,
-       chain!(kw_switch ~ lparen ~ decl:declaration ~ rparen ~
-              lbrace ~
-              ucss: many1!(union_case) ~
-              dfl: union_default? ~
-              rbrace,
-              || { (decl, ucss.into_iter().flat_map(|v| v).collect(), dfl) }));
+    do_parse!(
+        kw_switch >> lparen >> decl:declaration >> rparen >>
+        lbrace >>
+        ucss: many1!(union_case) >>
+        dfl: opt!(union_default) >>
+        rbrace >>
+        (decl, ucss.into_iter().flat_map(|v| v).collect(), dfl)
+    )
+);
 
 named!(union_case< Vec<UnionCase> >,
-       chain!(vs: many1!(chain!(kw_case ~ v:value ~ colon, || { v })) ~
-              decl: declaration ~ semi,
-              || { vs.into_iter().map(|v| UnionCase(v, decl.clone())).collect() }));
+    do_parse!(
+        vs: many1!(do_parse!(kw_case >> v:value >> colon >> (v))) >>
+        decl: declaration >> semi >>
+        (vs.into_iter().map(|v| UnionCase(v, decl.clone())).collect())
+    )
+);
 
 named!(union_default<Decl>,
-       chain!(kw_default ~ colon ~ decl: declaration ~ semi,
-              || { decl }));
+    do_parse!(
+        kw_default >> colon >>
+        decl: declaration >> semi >>
+        (decl)
+    )
+);
 
 named!(declaration<Decl>,
-       alt!(kw_void => { |_| Decl::Void } |
-            nonvoid_declaration));
+    alt!(kw_void => { |_| Decl::Void } |
+        nonvoid_declaration));
 
 named!(nonvoid_declaration<Decl>,
-       alt!(chain!(ty: array_type_spec ~ id: ident ~ lbrack ~ sz:value ~ rbrack,
-                   || Decl::named(id, Type::array(ty, sz))) |
-            chain!(ty: array_type_spec ~ id: ident ~ lt ~ sz:value? ~ gt,
-                   || Decl::named(id, Type::flex(ty, sz))) |
-
-            chain!(ty: type_spec ~ star ~ id: ident,
-                   || Decl::named(id, Type::option(ty))) |
-
-            chain!(ty: type_spec ~ id: ident,
-                   || Decl::named(id, ty))
-            )
-       );
+    alt!(
+        do_parse!(ty: array_type_spec >> id: ident >> lbrack >> sz:value >> rbrack >>
+            (Decl::named(id, Type::array(ty, sz))))
+    |   do_parse!(ty: array_type_spec >> id: ident >> lt >> sz:opt!(value) >> gt >>
+            (Decl::named(id, Type::flex(ty, sz))))
+    |   do_parse!(ty: type_spec >> star >> id: ident >>
+            (Decl::named(id, Type::option(ty))))
+    |   do_parse!(ty: type_spec >> id: ident >>
+            (Decl::named(id, ty)))
+    )
+);
 
 named!(array_type_spec<Type>,
        alt!(kw_opaque => { |_| Type::Opaque } |
@@ -506,32 +564,34 @@ fn test_decls() {
 }
 
 named!(type_spec<Type>,
-       preceded!(spaces,
-                 alt!(chain!(kw_unsigned ~ kw_int, || Type::UInt) |
-                      chain!(kw_unsigned ~ kw_long, || Type::UInt) |          // backwards compat with rpcgen
-                      chain!(kw_unsigned ~ kw_char,                           // backwards compat with rpcgen
-                        || Type::ident_with_derives("u8", COPY | CLONE | EQ | PARTIALEQ | DEBUG)) |
-                      chain!(kw_unsigned ~ kw_short, || Type::UInt) |         // backwards compat with rpcgen
-                      chain!(kw_unsigned ~ kw_hyper, || Type::UHyper) |
-                      kw_unsigned => { |_| Type::UInt } |                     // backwards compat with rpcgen
-                      kw_long => { |_| Type::Int } |                          // backwards compat with rpcgen
-                      kw_char => {                                            // backwards compat with rpcgen
-                          |_| Type::ident_with_derives("i8", COPY | CLONE | EQ | PARTIALEQ | DEBUG) } |
-                      kw_short => { |_| Type::Int } |                         // backwards compat with rpcgen
-                      kw_int => { |_| Type::Int } |
-                      kw_hyper => { |_| Type::Hyper } |
-                      kw_float => { |_| Type::Float } |
-                      kw_double => { |_| Type::Double } |
-                      kw_quadruple => { |_| Type::Quadruple } |
-                      kw_bool => { |_| Type::Bool } |
-                      enum_type_spec => { |defns| Type::Enum(defns) } |
-                      struct_type_spec => { |defns| Type::Struct(defns) } |
-                      chain!(kw_struct ~ id:ident, || Type::ident(id)) |    // backwards compat with rpcgen
-                      union_type_spec => { |u| Type::union(u) } |
-                      ident => { |id| Type::ident(id) }
-                      )
-                 )
-       );
+    preceded!(spaces,
+        alt!(
+            do_parse!(kw_unsigned >> kw_int >> (Type::UInt)) |
+            do_parse!(kw_unsigned >> kw_long >> (Type::UInt)) |          // backwards compat with rpcgen
+            do_parse!(kw_unsigned >> kw_char >>                          // backwards compat with rpcgen
+                (Type::ident_with_derives("u8", COPY | CLONE | EQ | PARTIALEQ | DEBUG))) |
+            do_parse!(kw_unsigned >> kw_short >> (Type::UInt)) |         // backwards compat with rpcgen
+            do_parse!(kw_unsigned >> kw_hyper >> (Type::UHyper)) |
+            kw_unsigned => { |_| Type::UInt } |                     // backwards compat with rpcgen
+            kw_long => { |_| Type::Int } |                          // backwards compat with rpcgen
+            kw_char => {                                            // backwards compat with rpcgen
+                |_| Type::ident_with_derives("i8", COPY | CLONE | EQ | PARTIALEQ | DEBUG)
+            } |
+            kw_short => { |_| Type::Int } |                         // backwards compat with rpcgen
+            kw_int => { |_| Type::Int } |
+            kw_hyper => { |_| Type::Hyper } |
+            kw_float => { |_| Type::Float } |
+            kw_double => { |_| Type::Double } |
+            kw_quadruple => { |_| Type::Quadruple } |
+            kw_bool => { |_| Type::Bool } |
+            enum_type_spec => { |defns| Type::Enum(defns) } |
+            struct_type_spec => { |defns| Type::Struct(defns) } |
+            do_parse!(kw_struct >> id:ident >> (Type::ident(id))) |    // backwards compat with rpcgen
+            union_type_spec => { |u| Type::union(u) } |
+            ident => { |id| Type::ident(id) }
+        )
+    )
+);
 
 #[test]
 fn test_type() {
@@ -596,7 +656,10 @@ fn test_enum() {
 }
 
 named!(const_def<Defn>,
-       chain!(kw_const ~ id:ident ~ eq ~ v:number ~ semi, || Defn::constant(id, v)));
+    do_parse!(
+        kw_const >> id:ident >> eq >> v:number >> semi >>
+            (Defn::constant(id, v)))
+);
 
 #[test]
 fn test_const() {
@@ -604,24 +667,26 @@ fn test_const() {
 }
 
 named!(type_def<Defn>,
-       alt!(chain!(kw_typedef ~ decl: nonvoid_declaration ~ semi,
-                   || {
-                       match decl.clone() {
-                           Decl::Named(name, ty) => {
-                               if ty.is_syn() {
-                                   Defn::typesyn(name, ty)
-                               } else {
-                                   Defn::typespec(name, ty)
-                               }
-                           },
-                           Decl::Void => panic!("void non-void declaration?"),
-                       }
-                   }) |
-            chain!(kw_enum ~ id:ident ~ e:enum_body ~ semi,     || Defn::typespec(id, Type::Enum(e))) |
-            chain!(kw_struct ~ id:ident ~ s:struct_body ~ semi, || Defn::typespec(id, Type::Struct(s))) |
-            chain!(kw_union ~ id:ident ~ u:union_body ~ semi,   || Defn::typespec(id, Type::union(u)))
-            )
-    );
+    alt!(
+        do_parse!(kw_typedef >> decl: nonvoid_declaration >> semi >>
+            ({
+                match decl.clone() {
+                    Decl::Named(name, ty) => {
+                        if ty.is_syn() {
+                            Defn::typesyn(name, ty)
+                        } else {
+                            Defn::typespec(name, ty)
+                        }
+                    },
+                    Decl::Void => panic!("void non-void declaration?"),
+                }
+            })
+        )
+    |   do_parse!(kw_enum >> id:ident >> e:enum_body >> semi >> (Defn::typespec(id, Type::Enum(e))))
+    |   do_parse!(kw_struct >> id:ident >> s:struct_body >> semi >> (Defn::typespec(id, Type::Struct(s))))
+    |   do_parse!(kw_union >> id:ident >> u:union_body >> semi >> (Defn::typespec(id, Type::union(u))))
+    )
+);
 
 #[test]
 fn test_typedef() {

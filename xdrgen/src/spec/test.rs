@@ -189,6 +189,20 @@ fn constants() {
 }
 
 #[test]
+fn union_simple() {
+    let s = specification(
+        r#"
+union foo switch (int x) {
+case 0:
+    int val;
+};
+"#,
+    );
+    println!("spec {:?}", s);
+    assert!(s.is_ok())
+}
+
+#[test]
 fn union_default() {
     let s = specification(
         r#"
