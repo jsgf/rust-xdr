@@ -758,13 +758,13 @@ impl Emitpack for Typespec {
                         let disc = val.as_token(symtab);
 
                         let ret = match decl {
-                            &Void => quote!(&#name::#label => #disc.pack(out)?,),
+                            &Void => quote!(&#name::#label => (#disc as i32).pack(out)?,),
                             &Named(_, ref ty) => {
                                 let pack = match ty.packer(quote!(val), symtab) {
                                     Err(_) => return None,
                                     Ok(p) => p,
                                 };
-                                quote!(&#name::#label(ref val) => #disc.pack(out)? + #pack,)
+                                quote!(&#name::#label(ref val) => (#disc as i32).pack(out)? + #pack,)
                             }
                         };
                         Some(ret)
