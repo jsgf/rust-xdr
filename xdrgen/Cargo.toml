@@ -1,6 +1,6 @@
 [package]
 name = "xdrgen"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["Jeremy Fitzhardinge <jeremy@goop.org>"]
 license = "MIT/Apache-2.0"
 description = "XDR codec generator from specification. Designed for use with xdr-codec."
