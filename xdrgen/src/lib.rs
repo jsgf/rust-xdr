@@ -6,6 +6,8 @@
 //! It is intended to be used with the "xdr-codec" crate, which provides the runtime library for
 //! encoding/decoding primitive types, strings, opaque data and arrays.
 
+#![recursion_limit="128"]
+
 extern crate xdr_codec as xdr;
 
 #[macro_use]

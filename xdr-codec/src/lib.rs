@@ -192,20 +192,57 @@ where
     In: Read,
     T: Unpack<In> + Clone,
 {
+    #[inline]
+    fn set<T>(p: &mut T, v: T) { *p = v }
+    #[inline]
+    fn drop<T>(_: &mut T) { }
+
+    unpack_array_with(input, array, arraysz, set, drop, defl)
+}
+
+/// Specialized variant of `unpack_array` which initializes the element via a callback. This is primarily
+/// so that the array can be uninitialized, and we initialize it element at a time with `ptr::write()`.
+#[inline]
+pub fn unpack_array_with<In, T>(
+    input: &mut In,
+    array: &mut [T],
+    arraysz: usize,
+    set: fn (&mut T, T),
+    drop: fn(&mut T),
+    defl: Option<&T>,
+) -> Result<usize>
+where
+    In: Read,
+    T: Unpack<In> + Clone,
+{
     let mut rsz = 0;
     let sz = min(arraysz, array.len());
-
-    for elem in &mut array[..sz] {
-        let (v, sz) = Unpack::unpack(input)?;
-        rsz += sz;
-        *elem = v;
+ 
+    // If we fail part way through then return the error and the index we got up to
+    // so we can clean up the entries we did initialize.
+    let res = (|| {
+            for (idx, elem) in (&mut array[..sz]).into_iter().enumerate() {
+                let (v, sz) = match Unpack::unpack(input) {
+                    Ok(v) => v,
+                    Err(e) => return Some((idx, e)),
+                };
+                rsz += sz;
+                set(elem, v);
+            }
+            None
+        })();
+    if let Some((idx, err)) = res {
+        for elem in &mut array[..idx] {
+            drop(elem)
+        };
+        return Err(err);
     }
 
     // Fill in excess array entries with default values
     if arraysz < array.len() {
         if let Some(defl) = defl {
             for elem in &mut array[arraysz..] {
-                *elem = defl.clone();
+                set(elem, defl.clone());
             }
         } else {
             bail!(ErrorKind::InvalidLen(arraysz));

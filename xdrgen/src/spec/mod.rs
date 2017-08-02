@@ -355,9 +355,45 @@ impl Type {
                     }
                     ty => {
                         let ty = ty.as_token(symtab).unwrap();
+                        // Create the return array as uninitialized, since we don't know what to initialize it until
+                        // we can deserialize values. We don't even have a guaranteed value we can populate it with, since
+                        // the type may not implement Default (and it would be a waste anyway, since they're going to be
+                        // replaced).
+                        //
+                        // However, having an uninitialized array makes for lots of awkward corner cases.
+                        // Even in the common case, we can't simply use `unpack_array`, as it will replace each element
+                        // by assignment, but that will Drop any existing value - but in this case that will be undefined
+                        // as they're uninitialized. So we need to use `unpack_array_with` that allows us to specify a function
+                        // which does the initializing assignment. In this case we use `ptr::write` which overwrites memory
+                        // without Dropping the current contents.
+                        //
+                        // With that solved, we also need to deal with the error cases, where the array could be partially
+                        // initialized. For this case, `unpack_array_with` also takes a drop function which deinitializes
+                        // the partially initialized elements, so the array is left uninitialized in the failure case.
+                        // We can then just use `mem::forget` to dispose of the whole thing.
+                        //
+                        // We also need to catch panics to make sure the buf is forgotten. It may be partially initialized then
+                        // it may leak, but that's better than calling Drop on uninitialized elements.
                         quote!({
+                            #[inline]
+                            fn uninit_ptr_setter<T>(p: &mut T, v: T) {
+                                unsafe { ::std::ptr::write(p, v) }
+                            }
+                            #[inline]
+                            fn uninit_ptr_dropper<T>(p: &mut T) {
+                                unsafe { ::std::ptr::drop_in_place(p) }
+                            }
                             let mut buf: [#ty; #value as usize] = unsafe { ::std::mem::uninitialized() };
-                            let sz = xdr_codec::unpack_array(input, &mut buf[..], #value as usize, None)?;
+                            let res = ::std::panic::catch_unwind(
+                                ::std::panic::AssertUnwindSafe(||
+                                    xdr_codec::unpack_array_with(
+                                        input, &mut buf[..], #value as usize, uninit_ptr_setter, uninit_ptr_dropper, None)));
+
+                            let sz = match res {
+                                Ok(Ok(sz)) => sz,
+                                Ok(Err(err)) => { ::std::mem::forget(buf); return Err(err); }
+                                Err(panic) => { ::std::mem::forget(buf); ::std::panic::resume_unwind(panic);  }
+                            };
                             (buf, sz)
                         })
                     }
