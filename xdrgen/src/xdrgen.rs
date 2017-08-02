@@ -16,6 +16,7 @@ fn main() {
     let _ = env_logger::init();
 
     let matches = App::new("XDR code generator")
+        .version(env!("CARGO_PKG_VERSION"))
         .arg_from_usage("[FILE] 'Set .x file'")
         .get_matches();
 
