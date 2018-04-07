@@ -48,37 +48,42 @@ named!(spec< Vec<Defn> >,
         (defns))
 );
 
-#[test]
-fn test_spec() {
-    assert_eq!(spec(&b"#include <foo>"[..]),
-               Done(&b""[..], vec!()));
+#[cfg(test)]
+mod spec_tests {
+    use super::*;
 
-    assert_eq!(spec(&b"// hello\n#include <foo>"[..]),
-               Done(&b""[..], vec!()));
+    #[test]
+    fn it_can_parse_the_spec_and_ignore_comments_and_cdirectives() {
+        assert_eq!(spec(&b"#include <foo>"[..]),
+                   Done(&b""[..], vec!()));
 
-    assert_eq!(spec(&b"#include <foo>\ntypedef int foo;"[..]),
-               Done(&b""[..], vec!(Defn::typesyn("foo", Type::Int))));
+        assert_eq!(spec(&b"// hello\n#include <foo>"[..]),
+                   Done(&b""[..], vec!()));
 
-    assert_eq!(spec(&br#"
-/* test file */
-#define foo bar
-const mip = 123;
-% passthrough
-typedef int foo;
-struct bar {
-        int a;
-        int b;
-};
-#include "other"
-enum bop { a = 2, b = 1 };
-"#[..]),
-               Done(&b""[..],
-                    vec!(Defn::constant("mip", 123),
-                         Defn::typesyn("foo", Type::Int),
-                         Defn::typespec("bar", Type::Struct(vec!(Decl::named("a", Type::Int),
-                                                                               Decl::named("b", Type::Int)))),
-                         Defn::typespec("bop", Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(2))),
-                                                                             EnumDefn::new("b", Some(Value::Const(1)))))))));
+        assert_eq!(spec(&b"#include <foo>\ntypedef int foo;"[..]),
+                   Done(&b""[..], vec!(Defn::typesyn("foo", Type::Int))));
+
+        assert_eq!(spec(&br#"
+    /* test file */
+    #define foo bar
+    const mip = 123;
+    % passthrough
+    typedef int foo;
+    struct bar {
+            int a;
+            int b;
+    };
+    #include "other"
+    enum bop { a = 2, b = 1 };
+    "#[..]),
+                   Done(&b""[..],
+                        vec!(Defn::constant("mip", 123),
+                             Defn::typesyn("foo", Type::Int),
+                             Defn::typespec("bar", Type::Struct(vec!(Decl::named("a", Type::Int),
+                                                                                   Decl::named("b", Type::Int)))),
+                             Defn::typespec("bop", Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(2))),
+                                                                                 EnumDefn::new("b", Some(Value::Const(1)))))))));
+    }
 }
 
 named!(definition<Defn>,
@@ -153,34 +158,42 @@ named!(decnumber<i64>,
 
 named!(number<i64>, preceded!(spaces, alt!(hexnumber | octnumber | decnumber)));
 
-#[test]
-fn test_nums() {
-    // Complete number
-    assert_eq!(number(&b"0x12344+"[..]), Done(&b"+"[..], 0x12344));
-    assert_eq!(number(&b"012344+"[..]), Done(&b"+"[..], 0o12344));
-    assert_eq!(number(&b"-012344+"[..]), Done(&b"+"[..], -0o12344));
-    assert_eq!(number(&b"12344+"[..]), Done(&b"+"[..], 12344));
-    assert_eq!(number(&b"-12344+"[..]), Done(&b"+"[..], -12344));
-    assert_eq!(number(&b"0+"[..]), Done(&b"+"[..], 0));
-    assert_eq!(number(&b"-0+"[..]), Done(&b"+"[..], 0));
+#[cfg(test)]
+mod number_tests {
+    use super::*;
 
-    // Space prefix number
-    assert_eq!(number(&b" 0x12344+"[..]), Done(&b"+"[..], 0x12344));
-    assert_eq!(number(&b" 012344+"[..]), Done(&b"+"[..], 0o12344));
-    assert_eq!(number(&b" -012344+"[..]), Done(&b"+"[..], -0o12344));
-    assert_eq!(number(&b" 12344+"[..]), Done(&b"+"[..], 12344));
-    assert_eq!(number(&b" -12344+"[..]), Done(&b"+"[..], -12344));
-    assert_eq!(number(&b" 0+"[..]), Done(&b"+"[..], 0));
-    assert_eq!(number(&b" -0+"[..]), Done(&b"+"[..], 0));
+    #[test]
+    fn complete_numbers() {
+        assert_eq!(number(&b"0x12344+"[..]), Done(&b"+"[..], 0x12344));
+        assert_eq!(number(&b"012344+"[..]), Done(&b"+"[..], 0o12344));
+        assert_eq!(number(&b"-012344+"[..]), Done(&b"+"[..], -0o12344));
+        assert_eq!(number(&b"12344+"[..]), Done(&b"+"[..], 12344));
+        assert_eq!(number(&b"-12344+"[..]), Done(&b"+"[..], -12344));
+        assert_eq!(number(&b"0+"[..]), Done(&b"+"[..], 0));
+        assert_eq!(number(&b"-0+"[..]), Done(&b"+"[..], 0));
+    }
 
-    // Incomplete number
-    assert_eq!(number(&b"0x12344"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"012344"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"-012344"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"12344"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"-12344"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"0"[..]), Incomplete(Needed::Unknown));
-    assert_eq!(number(&b"-0"[..]), Incomplete(Needed::Unknown));
+    #[test]
+    fn space_prefix_numbers() {
+        assert_eq!(number(&b" 0x12344+"[..]), Done(&b"+"[..], 0x12344));
+        assert_eq!(number(&b" 012344+"[..]), Done(&b"+"[..], 0o12344));
+        assert_eq!(number(&b" -012344+"[..]), Done(&b"+"[..], -0o12344));
+        assert_eq!(number(&b" 12344+"[..]), Done(&b"+"[..], 12344));
+        assert_eq!(number(&b" -12344+"[..]), Done(&b"+"[..], -12344));
+        assert_eq!(number(&b" 0+"[..]), Done(&b"+"[..], 0));
+        assert_eq!(number(&b" -0+"[..]), Done(&b"+"[..], 0));
+    }
+
+    #[test]
+    fn incomplete_numbers_are_unknown() {
+        assert_eq!(number(&b"0x12344"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"012344"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"-012344"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"12344"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"-12344"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"0"[..]), Incomplete(Needed::Unknown));
+        assert_eq!(number(&b"-0"[..]), Incomplete(Needed::Unknown));
+    }
 }
 
 fn token(input: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -268,52 +281,70 @@ named!(keyword<()>,
             kw_unsigned |
             kw_void));
 
-#[test]
-fn test_kw() {
-    let kws = vec!("bool", "case", "const", "default",
-                   "double", "enum", "float", "hyper", "int",
-                   "opaque", "quadruple", "string", "struct",
-                   "switch", "typedef", "union", "unsigned", "void");
+#[cfg(test)]
+mod keyword_tests {
+    use super::*;
 
-    for k in &kws {
-        println!("testing \"{}\"", k);
-        match keyword((*k).as_bytes()) {
-            Incomplete(_) => (),
-            err => panic!("failed \"{}\": {:?}", k, err),
+    fn kws<'a>() -> Vec<&'a str> {
+        vec!("bool", "case", "const", "default",
+             "double", "enum", "float", "hyper", "int",
+             "opaque", "quadruple", "string", "struct",
+             "switch", "typedef", "union", "unsigned", "void")
+    }
+
+    #[test]
+    fn incomplete_case() {
+        for k in &kws() {
+            println!("testing \"{}\"", k);
+            match keyword((*k).as_bytes()) {
+                Incomplete(_) => (),
+                err => panic!("failed \"{}\": {:?}", k, err),
+            }
         }
     }
 
-    for k in &kws {
-        println!("testing \"{} \"", k);
-        match keyword((String::from(*k) + " ").as_bytes()) {
-            Done(rest, ()) if rest == &b" "[..] => (),
-            err => panic!("failed \"{} \": {:?}", k, err),
+    #[test]
+    fn complete_case() {
+        for k in &kws() {
+            println!("testing \"{} \"", k);
+            match keyword((String::from(*k) + " ").as_bytes()) {
+                Done(rest, ()) if rest == &b" "[..] => (),
+                err => panic!("failed \"{} \": {:?}", k, err),
+            }
         }
     }
 
-    for k in &kws {
-        println!("testing \"{}x \"", k);
-        match keyword((String::from(*k) + "x ").as_bytes()) {
-            Error(_) => (),
-            err => panic!("failed \"{}x \": {:?}", k, err),
+    #[test]
+    fn error_cases_with_trailing_x() {
+        for k in &kws() {
+            println!("testing \"{}x \"", k);
+            match keyword((String::from(*k) + "x ").as_bytes()) {
+                Error(_) => (),
+                err => panic!("failed \"{}x \": {:?}", k, err),
+            }
         }
     }
 
-    for k in &kws {
-        println!("testing \"{}x \"", k);
-        match keyword((String::from(" ") + *k + " ").as_bytes()) {
-            Done(rest, ()) if rest == &b" "[..] => (),
-            err => panic!("failed \" {} \": {:?}", k, err),
+    #[test]
+    fn complete_case_with_white_space() {
+        for k in &kws() {
+            println!("testing \" {} \"", k);
+            match keyword((String::from(" ") + *k + " ").as_bytes()) {
+                Done(rest, ()) if rest == &b" "[..] => (),
+                err => panic!("failed \" {} \": {:?}", k, err),
+            }
         }
     }
 
-    for nk in &vec!("boo", "in", "inx", "booll") {
-        match keyword((*nk).as_bytes()) {
-            e @ Done(..) => panic!("{:?} => {:?}", nk, e),
-            e => println!("{:?} => {:?}", nk, e),
+    #[test]
+    fn not_a_keyword() {
+        for nk in &vec!("boo", "in", "inx", "booll") {
+            match keyword((*nk).as_bytes()) {
+                e @ Done(..) => panic!("{:?} => {:?}", nk, e),
+                e => println!("{:?} => {:?}", nk, e),
+            }
         }
     }
-
 }
 
 fn ident(input: &[u8]) -> IResult<&[u8], &str> {
@@ -330,11 +361,16 @@ fn ident(input: &[u8]) -> IResult<&[u8], &str> {
     }
 }
 
-#[test]
-fn test_ident() {
-    assert_eq!(ident(&b"foo "[..]), Done(&b" "[..], "foo"));
-    assert_eq!(ident(&b" foo "[..]), Done(&b" "[..], "foo"));
-    assert_eq!(ident(&b" bool "[..]), Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..])));
+#[cfg(mod)]
+mod ident_tests {
+    use super::*;
+
+    #[test]
+    fn parses_idents() {
+        assert_eq!(ident(&b"foo "[..]), Done(&b" "[..], "foo"));
+        assert_eq!(ident(&b" foo "[..]), Done(&b" "[..], "foo"));
+        assert_eq!(ident(&b" bool "[..]), Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..])));
+    }
 }
 
 named!(blockcomment<()>,
@@ -359,22 +395,32 @@ named!(directive<()>,
     )
 );
 
-#[test]
-fn test_comments() {
-    assert_eq!(blockcomment(&b"/* foo */bar"[..]), Done(&b"bar"[..], ()));
-    assert_eq!(blockcomment(&b"/* blip /* foo */bar"[..]), Done(&b"bar"[..], ()));
-    assert_eq!(blockcomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
-    assert_eq!(linecomment(&b"// foo\nbar"[..]), Done(&b"\nbar"[..], ()));
-    assert_eq!(linecomment(&b"// foo bar\n "[..]), Done(&b"\n "[..], ()));
-    assert_eq!(linecomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
 
-    assert_eq!(directive(&b"#define foo bar\n "[..]), Done(&b"\n "[..], ()));
-    assert_eq!(directive(&b"%#define foo bar\n "[..]), Done(&b"\n "[..], ()));
+    #[test]
+    fn safely_ignore_comments() {
+        assert_eq!(blockcomment(&b"/* foo */bar"[..]), Done(&b"bar"[..], ()));
+        assert_eq!(blockcomment(&b"/* blip /* foo */bar"[..]), Done(&b"bar"[..], ()));
+        assert_eq!(blockcomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
+        assert_eq!(linecomment(&b"// foo\nbar"[..]), Done(&b"\nbar"[..], ()));
+        assert_eq!(linecomment(&b"// foo bar\n "[..]), Done(&b"\n "[..], ()));
+        assert_eq!(linecomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
+    }
 
-    assert_eq!(directive(&b"x"[..]), Error(Err::Position(ErrorKind::Alt, &b"x"[..])));
+    #[test]
+    fn safely_ignores_c_directives() {
+        assert_eq!(directive(&b"#define foo bar\n "[..]), Done(&b"\n "[..], ()));
+        assert_eq!(directive(&b"%#define foo bar\n "[..]), Done(&b"\n "[..], ()));
+        assert_eq!(preceded!(&b"\n#define x\n"[..], eol, directive),
+                   Done(&b"\n"[..], ()));
+    }
 
-    assert_eq!(preceded!(&b"\n#define x\n"[..], eol, directive),
-               Done(&b"\n"[..], ()));
+    #[test]
+    fn identify_unknown_directive() {
+        assert_eq!(directive(&b"x"[..]), Error(Err::Position(ErrorKind::Alt, &b"x"[..])));
+    }
 }
 
 named!(eol<()>, map!(alt!(apply!(ctag, "\n") |
@@ -409,29 +455,34 @@ fn ws(input: &[u8]) -> &[u8] {
     }
 }
 
-#[test]
-fn test_spaces() {
-    assert_eq!(eol(&b"\nx"[..]), Done(&b"x"[..], ()));
-    assert_eq!(eol(&b"\r\nx"[..]), Done(&b"x"[..], ()));
-    assert_eq!(eol(&b"\nx"[..]), Done(&b"x"[..], ()));
+#[cfg(test)]
+mod whitespace_tests {
+    use super::*;
 
-    assert_eq!(whitespace(&b"x"[..]), Error(Err::Position(ErrorKind::TakeWhile1, &b"x"[..])));
-    assert_eq!(whitespace(&b" x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(whitespace(&b"  x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(whitespace(&b"\tx"[..]), Done(&b"x"[..], ()));
-    assert_eq!(whitespace(&b" \tx"[..]), Done(&b"x"[..], ()));
-    assert_eq!(whitespace(&b"\t x"[..]), Done(&b"x"[..], ()));
+    #[test]
+    fn strips_out_whitespace() {
+        assert_eq!(eol(&b"\nx"[..]), Done(&b"x"[..], ()));
+        assert_eq!(eol(&b"\r\nx"[..]), Done(&b"x"[..], ()));
+        assert_eq!(eol(&b"\nx"[..]), Done(&b"x"[..], ()));
 
-    assert_eq!(spaces(&b"x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"\nx"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b" x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"      x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"\n\n  x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"\r\n  x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"//foo\n      x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"/*\n*/       x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"\n#define a b\n       x"[..]), Done(&b"x"[..], ()));
-    assert_eq!(spaces(&b"\n%foo a b\n       x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(whitespace(&b"x"[..]), Error(Err::Position(ErrorKind::TakeWhile1, &b"x"[..])));
+        assert_eq!(whitespace(&b" x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(whitespace(&b"  x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(whitespace(&b"\tx"[..]), Done(&b"x"[..], ()));
+        assert_eq!(whitespace(&b" \tx"[..]), Done(&b"x"[..], ()));
+        assert_eq!(whitespace(&b"\t x"[..]), Done(&b"x"[..], ()));
+
+        assert_eq!(spaces(&b"x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"\nx"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b" x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"      x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"\n\n  x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"\r\n  x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"//foo\n      x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"/*\n*/       x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"\n#define a b\n       x"[..]), Done(&b"x"[..], ()));
+        assert_eq!(spaces(&b"\n%foo a b\n       x"[..]), Done(&b"x"[..], ()));
+    }
 }
 
 named!(enum_type_spec< Vec<EnumDefn> >,
@@ -526,41 +577,59 @@ named!(array_type_spec<Type>,
             )
        );
 
-#[test]
-fn test_decls() {
-    assert_eq!(declaration(&b"void "[..]), Done(&b" "[..], Decl::Void));
+#[cfg(test)]
+mod declaration_tests {
+    use super::*;
 
-    assert_eq!(declaration(&b"int foo;"[..]), Done(&b";"[..], Decl::named("foo", Type::Int)));
-    assert_eq!(declaration(&b"int foo[123] "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Array(Box::new(Type::Int), Value::Const(123)))));
+    #[test]
+    fn parses_declartions() {
+        assert_eq!(declaration(&b"void "[..]), Done(&b" "[..], Decl::Void));
 
-    assert_eq!(declaration(&b"int foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Int), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"int foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Int), None))));
-    assert_eq!(declaration(&b"int *foo "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Option(Box::new(Type::Int)))));
+        assert_eq!(declaration(&b"int foo;"[..]), Done(&b";"[..], Decl::named("foo", Type::Int)));
+        assert_eq!(declaration(&b"int foo[123] "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Array(Box::new(Type::Int), Value::Const(123)))));
 
-    assert_eq!(declaration(&b"opaque foo[123] "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Array(Box::new(Type::Opaque), Value::Const(123)))));
-    assert_eq!(declaration(&b"opaque foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Opaque), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"opaque foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Opaque), None))));
+        assert_eq!(declaration(&b"int foo<123> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::Int), Some(Value::Const(123))))));
+        assert_eq!(declaration(&b"int foo<> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::Int), None))));
+        assert_eq!(declaration(&b"int *foo "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Option(Box::new(Type::Int)))));
 
-    assert_eq!(declaration(&b"string foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::String), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"string foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::String), None))));
+        assert_eq!(declaration(&b"opaque foo[123] "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Array(Box::new(Type::Opaque), Value::Const(123)))));
+        assert_eq!(declaration(&b"opaque foo<123> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::Opaque), Some(Value::Const(123))))));
+        assert_eq!(declaration(&b"opaque foo<> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::Opaque), None))));
+
+        assert_eq!(declaration(&b"string foo<123> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::String), Some(Value::Const(123))))));
+        assert_eq!(declaration(&b"string foo<> "[..]),
+                   Done(&b" "[..], Decl::named("foo",
+                                               Type::Flex(Box::new(Type::String), None))));
+        assert_eq!(
+            declaration(&b"union switch (int bar) { case 1: void; default: int val; } foo "[..]),
+            Done(&b" "[..],
+                 Decl::named(
+                     "foo",
+                     Type::Union(
+                         Box::new(Decl::named("bar", Type::Int)),
+                         vec!(UnionCase(Value::Const(1), Decl::Void)),
+                         Some(Box::new(Decl::named("val", Type::Int)))
+                     )
+                 )
+            )
+        );
+    }
 }
 
 named!(type_spec<Type>,
@@ -593,66 +662,77 @@ named!(type_spec<Type>,
     )
 );
 
-#[test]
-fn test_type() {
-    assert_eq!(type_spec(&b"int "[..]), Done(&b" "[..], Type::Int));
-    assert_eq!(type_spec(&b"unsigned int "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned\nint "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned/* foo */int "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned//\nint "[..]), Done(&b" "[..], Type::UInt));
+#[cfg(test)]
+mod type_spec_tests {
+    use super::*;
 
-    assert_eq!(type_spec(&b"unsigned hyper "[..]), Done(&b" "[..], Type::UHyper));
+    #[test]
+    fn parses_primitive_types() {
+        assert_eq!(type_spec(&b"int "[..]), Done(&b" "[..], Type::Int));
+        assert_eq!(type_spec(&b"unsigned int "[..]), Done(&b" "[..], Type::UInt));
+        assert_eq!(type_spec(&b"unsigned\nint "[..]), Done(&b" "[..], Type::UInt));
+        assert_eq!(type_spec(&b"unsigned/* foo */int "[..]), Done(&b" "[..], Type::UInt));
+        assert_eq!(type_spec(&b"unsigned//\nint "[..]), Done(&b" "[..], Type::UInt));
 
-    assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..],
-        Type::Ident("u8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
-    assert_eq!(type_spec(&b"unsigned short "[..]), Done(&b" "[..], Type::UInt));
+        assert_eq!(type_spec(&b"unsigned hyper "[..]), Done(&b" "[..], Type::UHyper));
 
-    assert_eq!(type_spec(&b" hyper "[..]), Done(&b" "[..], Type::Hyper));
-    assert_eq!(type_spec(&b" double "[..]), Done(&b" "[..], Type::Double));
-    assert_eq!(type_spec(&b"// thing\nquadruple "[..]), Done(&b" "[..], Type::Quadruple));
-    assert_eq!(type_spec(&b"// thing\n bool "[..]), Done(&b" "[..], Type::Bool));
+        assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..],
+            Type::Ident("u8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
+        assert_eq!(type_spec(&b"unsigned short "[..]), Done(&b" "[..], Type::UInt));
 
-    assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..],
-        Type::Ident("i8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
+        assert_eq!(type_spec(&b" hyper "[..]), Done(&b" "[..], Type::Hyper));
+        assert_eq!(type_spec(&b" double "[..]), Done(&b" "[..], Type::Double));
+        assert_eq!(type_spec(&b"// thing\nquadruple "[..]), Done(&b" "[..], Type::Quadruple));
+        assert_eq!(type_spec(&b"// thing\n bool "[..]), Done(&b" "[..], Type::Bool));
 
-    assert_eq!(type_spec(&b"short "[..]), Done(&b" "[..], Type::Int));
+        assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..],
+            Type::Ident("i8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
 
+        assert_eq!(type_spec(&b"short "[..]), Done(&b" "[..], Type::Int));
+    }
 
-    assert_eq!(type_spec(&b"struct { int a; int b; } "[..]),
-               Done(&b" "[..],
-                    Type::Struct(vec!(Decl::named("a", Type::Int),
-                                      Decl::named("b", Type::Int)))));
+    #[test]
+    fn parses_struct_types() {
+        assert_eq!(type_spec(&b"struct { int a; int b; } "[..]),
+                   Done(&b" "[..],
+                        Type::Struct(vec!(Decl::named("a", Type::Int),
+                                          Decl::named("b", Type::Int)))));
 
-    assert_eq!(type_spec(&b"union switch (int a) { case 1: void; case 2: int a; default: void; } "[..]),
-                         Done(&b" "[..],
-                              Type::Union(Box::new(Decl::named("a", Type::Int)),
-                                          vec!(UnionCase(Value::Const(1), Decl::Void),
-                                               UnionCase(Value::Const(2), Decl::named("a", Type::Int))),
-                                          Some(Box::new(Decl::Void)))));
-}
+    }
 
-#[test]
-fn test_enum() {
-    assert_eq!(type_spec(&b"enum { a, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", None),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+    #[test]
+    fn parses_union_types() {
+        assert_eq!(type_spec(&b"union switch (int a) { case 1: void; case 2: int a; default: void; } "[..]),
+                             Done(&b" "[..],
+                                  Type::Union(Box::new(Decl::named("a", Type::Int)),
+                                              vec!(UnionCase(Value::Const(1), Decl::Void),
+                                                   UnionCase(Value::Const(2), Decl::named("a", Type::Int))),
+                                              Some(Box::new(Decl::Void)))));
+    }
 
-    assert_eq!(type_spec(&b"enum { a = 1, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(1))),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+    #[test]
+    fn parses_enums() {
+        assert_eq!(type_spec(&b"enum { a, b, c } "[..]),
+                   Done(&b" "[..],
+                        Type::Enum(vec!(EnumDefn::new("a", None),
+                                        EnumDefn::new("b", None),
+                                        EnumDefn::new("c", None)))));
 
-    assert_eq!(type_spec(&b"enum { a = Bar, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::ident("Bar"))),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+        assert_eq!(type_spec(&b"enum { a = 1, b, c } "[..]),
+                   Done(&b" "[..],
+                        Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(1))),
+                                        EnumDefn::new("b", None),
+                                        EnumDefn::new("c", None)))));
 
-    assert_eq!(type_spec(&b"enum { } "[..]),
-               Error(Err::Position(ErrorKind::Alt, &b"enum { } "[..])));
+        assert_eq!(type_spec(&b"enum { a = Bar, b, c } "[..]),
+                   Done(&b" "[..],
+                        Type::Enum(vec!(EnumDefn::new("a", Some(Value::ident("Bar"))),
+                                        EnumDefn::new("b", None),
+                                        EnumDefn::new("c", None)))));
+
+        assert_eq!(type_spec(&b"enum { } "[..]),
+                   Error(Err::Position(ErrorKind::Alt, &b"enum { } "[..])));
+    }
 }
 
 named!(const_def<Defn>,
@@ -661,9 +741,14 @@ named!(const_def<Defn>,
             (Defn::constant(id, v)))
 );
 
-#[test]
-fn test_const() {
-    assert_eq!(const_def(&b"const foo = 123;"[..]), Done(&b""[..], Defn::constant("foo", 123)));
+#[cfg(test)]
+mod constant_tests {
+    use super::*;
+
+    #[test]
+    fn parses_constants() {
+        assert_eq!(const_def(&b"const foo = 123;"[..]), Done(&b""[..], Defn::constant("foo", 123)));
+    }
 }
 
 named!(type_def<Defn>,
@@ -688,24 +773,38 @@ named!(type_def<Defn>,
     )
 );
 
-#[test]
-fn test_typedef() {
-    assert_eq!(type_def(&b"typedef int foo;"[..]),
-               Done(&b""[..], Defn::typesyn("foo", Type::Int)));
-    assert_eq!(type_def(&b"typedef unsigned int foo;"[..]),
-               Done(&b""[..], Defn::typesyn("foo", Type::UInt)));
-    assert_eq!(type_def(&b"typedef int foo<>;"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Flex(Box::new(Type::Int), None))));
+#[cfg(test)]
+mod typedef_tests {
+    use super::*;
 
-    assert_eq!(type_def(&b"enum foo { a };"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Enum(vec!(EnumDefn::new("a", None))))));
+    #[test]
+    fn parses_primitive_type_defs() {
+        assert_eq!(type_def(&b"typedef int foo;"[..]),
+                   Done(&b""[..], Defn::typesyn("foo", Type::Int)));
+        assert_eq!(type_def(&b"typedef unsigned int foo;"[..]),
+                   Done(&b""[..], Defn::typesyn("foo", Type::UInt)));
+        assert_eq!(type_def(&b"typedef int foo<>;"[..]),
+                   Done(&b""[..], Defn::typespec("foo", Type::Flex(Box::new(Type::Int), None))));
+    }
 
-    assert_eq!(type_def(&b"struct foo { int a; };"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Struct(vec!(Decl::named("a", Type::Int))))));
+    #[test]
+    fn parses_enum_type() {
+        assert_eq!(type_def(&b"enum foo { a };"[..]),
+                   Done(&b""[..], Defn::typespec("foo", Type::Enum(vec!(EnumDefn::new("a", None))))));
+    }
 
-    assert_eq!(type_def(&b"union foo switch(int a) { case 1: int a; };"[..]),
-               Done(&b""[..], Defn::typespec("foo",
-                                             Type::Union(Box::new(Decl::named("a", Type::Int)),
-                                                         vec!(UnionCase(Value::Const(1), Decl::named("a", Type::Int))),
-                                                         None))));
+    #[test]
+    fn parses_struct_types() {
+        assert_eq!(type_def(&b"struct foo { int a; };"[..]),
+                   Done(&b""[..], Defn::typespec("foo", Type::Struct(vec!(Decl::named("a", Type::Int))))));
+    }
+
+    #[test]
+    fn parses_unions_types() {
+        assert_eq!(type_def(&b"union foo switch(int a) { case 1: int a; };"[..]),
+                   Done(&b""[..], Defn::typespec("foo",
+                                                 Type::Union(Box::new(Decl::named("a", Type::Int)),
+                                                             vec!(UnionCase(Value::Const(1), Decl::named("a", Type::Int))),
+                                                             None))));
+    }
 }
