@@ -19,7 +19,7 @@ unstable = []
 
 [dependencies]
 byteorder = "1.0"
-error-chain = "0.10"
+error-chain = "0.12"
 
 [dev-dependencies]
 quickcheck = "0.4"
