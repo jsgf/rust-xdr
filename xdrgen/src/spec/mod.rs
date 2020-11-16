@@ -36,19 +36,19 @@ impl ToTokens for Derives {
 
         let mut der = Vec::new();
 
-        if self.contains(COPY) {
+        if self.contains(Derives::COPY) {
             der.push(quote!(Copy))
         }
-        if self.contains(CLONE) {
+        if self.contains(Derives::CLONE) {
             der.push(quote!(Clone))
         }
-        if self.contains(DEBUG) {
+        if self.contains(Derives::DEBUG) {
             der.push(quote!(Debug))
         }
-        if self.contains(EQ) {
+        if self.contains(Derives::EQ) {
             der.push(quote!(Eq))
         }
-        if self.contains(PARTIALEQ) {
+        if self.contains(Derives::PARTIALEQ) {
             der.push(quote!(PartialEq))
         }
 
@@ -73,7 +73,7 @@ lazy_static! {
             "while", "yield",
         ];
 
-        kws.into_iter().map(|x| *x).collect()
+        kws.iter().map(|x| *x).collect()
     };
 }
 
@@ -222,7 +222,7 @@ impl Type {
         use self::Type::*;
         let mut memoset = HashMap::new();
 
-        let mut memo = match memo {
+        let memo = match memo {
             None => &mut memoset,
             Some(m) => m,
         };
@@ -238,7 +238,7 @@ impl Type {
             &Array(ref ty, ref len) => {
                 let ty = ty.as_ref();
                 let set = match ty {
-                    &Opaque | &String => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
+                    &Opaque | &String => Derives::EQ | Derives::PARTIALEQ | Derives::COPY | Derives::CLONE | Derives::DEBUG,
                     ref ty => ty.derivable(symtab, Some(memo)),
                 };
                 match len.as_i64(symtab) {
@@ -248,10 +248,10 @@ impl Type {
             }
             &Flex(ref ty, ..) => {
                 let set = ty.derivable(symtab, Some(memo));
-                set & !COPY // no Copy, everything else OK
+                set & !Derives::COPY // no Copy, everything else OK
             }
-            &Enum(_) => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
-            &Option(ref ty) => ty.derivable(symtab, Some(memo)),
+            &Enum(_) => Derives::EQ | Derives::PARTIALEQ | Derives::COPY | Derives::CLONE | Derives::DEBUG,
+            &Option(ref ty) => ty.derivable(symtab, Some(memo)) & !Derives::COPY,
             &Struct(ref fields) => {
                 fields.iter().fold(Derives::all(), |a, f| {
                     a & f.derivable(symtab, memo)
@@ -277,10 +277,10 @@ impl Type {
                 }
             }
 
-            &Float | &Double => PARTIALEQ | COPY | CLONE | DEBUG,
+            &Float | &Double => Derives::PARTIALEQ | Derives::COPY | Derives::CLONE | Derives::DEBUG,
             ty if ty.is_prim(symtab) => Derives::all(),
 
-            _ => Derives::all() & !COPY,
+            _ => Derives::all() & !Derives::COPY,
         };
 
         memo.insert(self.clone(), set);
@@ -348,7 +348,7 @@ impl Type {
                 match ty {
                     &Opaque | &String => {
                         quote!({
-                            let mut buf: [u8; #value as usize] = unsafe { ::std::mem::uninitialized() };
+                            let mut buf: [u8; #value as usize] = unsafe { ::std::mem::MaybeUninit::uninit().assume_init() };
                             let sz = xdr_codec::unpack_opaque_array(input, &mut buf[..], #value as usize)?;
                             (buf, sz)
                         })
@@ -383,7 +383,7 @@ impl Type {
                             fn uninit_ptr_dropper<T>(p: &mut T) {
                                 unsafe { ::std::ptr::drop_in_place(p) }
                             }
-                            let mut buf: [#ty; #value as usize] = unsafe { ::std::mem::uninitialized() };
+                            let mut buf: [#ty; #value as usize] = unsafe { ::std::mem::MaybeUninit::uninit().assume_init() };
                             let res = ::std::panic::catch_unwind(
                                 ::std::panic::AssertUnwindSafe(||
                                     xdr_codec::unpack_array_with(
