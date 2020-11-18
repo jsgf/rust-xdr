@@ -98,6 +98,12 @@ where
             .collect::<Result<Vec<_>>>()?
     };
 
+    #[allow(unused_mut)]
+    let mut imports = String::new();
+
+    #[cfg(feature="derive_serde")]
+    imports.push_str("use serde::{Serialize, Deserialize};\n");
+
     let _ = writeln!(
         output,
         r#"
@@ -106,9 +112,9 @@ where
 // Generated from {} by xdrgen.
 //
 // DO NOT EDIT
-
+{}
 "#,
-        infile
+        infile, imports
     );
 
     for it in res {

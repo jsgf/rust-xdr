@@ -9,6 +9,7 @@ documentation = "https://docs.rs/xdr-codec"
 readme = "README.md"
 keywords = ["encoding", "protocol", "xdr", "rfc4506", "serialization"]
 include = [ "src/**/*.rs", "tests/**/*.rs", "*.md", "Cargo.toml"  ]
+edition = "2018"
 
 [features]
 # Enable use of `Pack`/`Unpack` traits for `i8`/`u8`. Normally this is disabled to

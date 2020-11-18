@@ -1,4 +1,4 @@
-extern crate xdr_codec;
+use xdr_codec;
 
 use std::io::Cursor;
 use xdr_codec::{unpack,pack};
@@ -19,6 +19,8 @@ fn main() {
         thing: simple::Things::C,
         type_: 123,
     };
+    // "derive_serde" feature makes this working
+    // println!("Serialized JSON: {}", serde_json::to_string(&foo).unwrap());
 
     let mut buf = Vec::new();
 

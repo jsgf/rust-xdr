@@ -15,7 +15,7 @@
 use std::io::{self, BufRead, Read, Write};
 use std::cmp::min;
 
-use error::*;
+use crate::error::*;
 
 use super::{Error, pack, unpack};
 

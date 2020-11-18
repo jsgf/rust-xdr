@@ -52,6 +52,11 @@ impl ToTokens for Derives {
             der.push(quote!(PartialEq))
         }
 
+        #[cfg(feature="derive_serde")] {
+            der.push(quote!(Serialize));
+            der.push(quote!(Deserialize));
+        }
+
         toks.append_separated(der, ",");
         toks.append(")]");
     }
