@@ -21,6 +21,7 @@ doc = false
 [features]
 unstable = []
 derive_serde = ["serde"]
+omit_case_warnings = []
 
 [dependencies]
 log = "0.3"

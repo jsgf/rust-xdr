@@ -32,6 +32,9 @@ impl ToTokens for Derives {
             return;
         }
 
+        #[cfg(feature="omit_case_warnings")]
+        toks.append("#[allow(non_snake_case, non_camel_case_types)]\n");
+
         toks.append("#[derive(");
 
         let mut der = Vec::new();
@@ -983,6 +986,7 @@ impl Emitpack for Typespec {
             impl<In: xdr_codec::Read> xdr_codec::Unpack<In> for #name {
                 #directive
                     fn unpack(input: &mut In) -> xdr_codec::Result<(#name, usize)> {
+                        #[allow(unused_assignments)]
                         let mut sz = 0;
                         Ok((#body, sz))
                     }
