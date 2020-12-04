@@ -4,7 +4,8 @@ use std::io::{Write, stderr};
 
 use std::result;
 
-use quote::{self, ToTokens, Tokens};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{self, ToTokens};
 
 mod xdr_nom;
 
@@ -27,41 +28,45 @@ bitflags! {
 }
 
 impl ToTokens for Derives {
-    fn to_tokens(&self, toks: &mut Tokens) {
+    fn to_tokens(&self, toks: &mut TokenStream) {
         if self.is_empty() {
             return;
         }
 
+        let mut tokens = toks.to_string();
+
         #[cfg(feature="omit_case_warnings")]
-        toks.append("#[allow(non_snake_case, non_camel_case_types)]\n");
+        tokens.push_str("#[allow(non_snake_case, non_camel_case_types)]");
 
-        toks.append("#[derive(");
-
-        let mut der = Vec::new();
+        let mut der = Vec::<&str>::new();
 
         if self.contains(Derives::COPY) {
-            der.push(quote!(Copy))
+            der.push("Copy")
         }
         if self.contains(Derives::CLONE) {
-            der.push(quote!(Clone))
+            der.push("Clone")
         }
         if self.contains(Derives::DEBUG) {
-            der.push(quote!(Debug))
+            der.push("Debug")
         }
         if self.contains(Derives::EQ) {
-            der.push(quote!(Eq))
+            der.push("Eq")
         }
         if self.contains(Derives::PARTIALEQ) {
-            der.push(quote!(PartialEq))
+            der.push("PartialEq")
         }
 
         #[cfg(feature="derive_serde")] {
-            der.push(quote!(Serialize));
-            der.push(quote!(Deserialize));
+            der.push("Serialize");
+            der.push("Deserialize");
         }
 
-        toks.append_separated(der, ",");
-        toks.append(")]");
+        #[cfg(feature="derive_json_schema")] {
+            der.push("JsonSchema");
+        }
+        
+        tokens.push_str(&format!("#[derive({})]", der.join(",")));
+        *toks = tokens.parse().unwrap()
     }
 }
 
@@ -85,13 +90,13 @@ lazy_static! {
     };
 }
 
-fn quote_ident<S: AsRef<str>>(id: S) -> quote::Ident {
+fn quote_ident<S: AsRef<str>>(id: S) -> Ident {
     let id = id.as_ref();
 
     if (*KEYWORDS).contains(id) {
-        quote::Ident::new(format!("{}_", id))
+        Ident::new(&format!("{}_", id), Span::call_site())
     } else {
-        quote::Ident::new(id)
+        Ident::new(id, Span::call_site())
     }
 }
 
@@ -106,15 +111,15 @@ impl Value {
         Value::Ident(id.as_ref().to_string())
     }
 
-    fn as_ident(&self) -> quote::Ident {
+    fn as_ident(&self) -> Ident {
         match self {
             &Value::Ident(ref id) => quote_ident(id),
             &Value::Const(val) => {
-                quote::Ident::new(format!(
+                Ident::new(&format!(
                     "Const{}{}",
                     (if val < 0 { "_" } else { "" }),
                     val.abs()
-                ))
+                ), Span::call_site())
             }
         }
     }
@@ -123,7 +128,7 @@ impl Value {
         symtab.value(self)
     }
 
-    fn as_token(&self, symtab: &Symtab) -> Tokens {
+    fn as_token(&self, symtab: &Symtab) -> TokenStream {
         match self {
             &Value::Const(c) => quote!(#c),
             &Value::Ident(ref id) => {
@@ -296,7 +301,7 @@ impl Type {
     }
 
 
-    fn packer(&self, val: Tokens, symtab: &Symtab) -> Result<Tokens> {
+    fn packer(&self, val: TokenStream, symtab: &Symtab) -> Result<TokenStream> {
         use self::Type::*;
 
         let res = match self {
@@ -345,7 +350,7 @@ impl Type {
         }
     }
 
-    fn unpacker(&self, symtab: &Symtab) -> Tokens {
+    fn unpacker(&self, symtab: &Symtab) -> TokenStream {
         use self::Type::*;
 
         match self {
@@ -429,7 +434,7 @@ impl Type {
         }
     }
 
-    fn as_token(&self, symtab: &Symtab) -> Result<Tokens> {
+    fn as_token(&self, symtab: &Symtab) -> Result<TokenStream> {
         use self::Type::*;
 
         let ret = match self {
@@ -516,7 +521,7 @@ impl Decl {
         Decl::Named(id.as_ref().to_string(), ty)
     }
 
-    fn name_as_ident(&self) -> Option<(quote::Ident, &Type)> {
+    fn name_as_ident(&self) -> Option<(Ident, &Type)> {
         use self::Decl::*;
         match self {
             &Void => None,
@@ -524,7 +529,7 @@ impl Decl {
         }
     }
 
-    fn as_token(&self, symtab: &Symtab) -> Result<Option<(quote::Ident, Tokens)>> {
+    fn as_token(&self, symtab: &Symtab) -> Result<Option<(Ident, TokenStream)>> {
         use self::Decl::*;
         match self {
             &Void => Ok(None),
@@ -581,16 +586,16 @@ impl Defn {
 }
 
 pub trait Emit {
-    fn define(&self, symtab: &Symtab) -> Result<Tokens>;
+    fn define(&self, symtab: &Symtab) -> Result<TokenStream>;
 }
 
 pub trait Emitpack: Emit {
-    fn pack(&self, symtab: &Symtab) -> Result<Option<Tokens>>;
-    fn unpack(&self, symtab: &Symtab) -> Result<Option<Tokens>>;
+    fn pack(&self, symtab: &Symtab) -> Result<Option<TokenStream>>;
+    fn unpack(&self, symtab: &Symtab) -> Result<Option<TokenStream>>;
 }
 
 impl Emit for Const {
-    fn define(&self, _: &Symtab) -> Result<Tokens> {
+    fn define(&self, _: &Symtab) -> Result<TokenStream> {
         let name = quote_ident(&self.0);
         let val = &self.1;
 
@@ -599,7 +604,7 @@ impl Emit for Const {
 }
 
 impl Emit for Typesyn {
-    fn define(&self, symtab: &Symtab) -> Result<Tokens> {
+    fn define(&self, symtab: &Symtab) -> Result<TokenStream> {
         let ty = &self.1;
         let name = quote_ident(&self.0);
         let tok = ty.as_token(symtab)?;
@@ -608,7 +613,7 @@ impl Emit for Typesyn {
 }
 
 impl Emit for Typespec {
-    fn define(&self, symtab: &Symtab) -> Result<Tokens> {
+    fn define(&self, symtab: &Symtab) -> Result<TokenStream> {
         use self::Type::*;
 
         let name = quote_ident(&self.0);
@@ -766,7 +771,7 @@ impl Emit for Typespec {
 }
 
 impl Emitpack for Typespec {
-    fn pack(&self, symtab: &Symtab) -> Result<Option<Tokens>> {
+    fn pack(&self, symtab: &Symtab) -> Result<Option<TokenStream>> {
         use self::Type::*;
         use self::Decl::*;
 
@@ -774,7 +779,7 @@ impl Emitpack for Typespec {
         let ty = &self.1;
         let mut directive = quote!();
 
-        let body: Tokens = match ty {
+        let body: TokenStream = match ty {
             &Enum(_) => {
                 directive = quote!(#[inline]);
                 ty.packer(quote!(self), symtab)?
@@ -863,7 +868,7 @@ impl Emitpack for Typespec {
         }))
     }
 
-    fn unpack(&self, symtab: &Symtab) -> Result<Option<Tokens>> {
+    fn unpack(&self, symtab: &Symtab) -> Result<Option<TokenStream>> {
         use self::Type::*;
         use self::Decl::*;
 

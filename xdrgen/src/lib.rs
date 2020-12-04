@@ -104,6 +104,9 @@ where
     #[cfg(feature="derive_serde")]
     imports.push_str("use serde::{Serialize, Deserialize};\n");
 
+    #[cfg(feature="derive_json_schema")]
+    imports.push_str("use schemars::JsonSchema;\n");
+
     let _ = writeln!(
         output,
         r#"
@@ -118,7 +121,7 @@ where
     );
 
     for it in res {
-        let _ = writeln!(output, "{}\n", it.as_str());
+        let _ = writeln!(output, "{}\n", it.to_string());
     }
 
     Ok(())

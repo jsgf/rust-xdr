@@ -22,16 +22,19 @@ doc = false
 unstable = []
 derive_serde = ["serde"]
 omit_case_warnings = []
+derive_json_schema = ["schemars"]
 
 [dependencies]
 log = "0.3"
 env_logger = "0.4"
 nom = { version="3.1", features=["verbose-errors"] }
-quote = "0.3"
+quote = "1"
+proc-macro2 = "1"
 clap = "2.24"
 lazy_static = "1.4"
 bitflags = "1.2"
 serde = {version = "1.0", features = ["derive"], optional = true}
+schemars = {version = "0.8", optional = true}
 
 [dependencies.xdr-codec]
 path = "../xdr-codec"
