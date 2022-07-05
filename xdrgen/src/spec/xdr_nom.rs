@@ -1,6 +1,6 @@
 // Grammar for a .x file specifying XDR type codecs. Does not include any RPC syntax. Should match RFC4506.
-use nom::{Err, ErrorKind, IResult, Needed, is_digit, is_space, not_line_ending};
 use nom::IResult::*;
+use nom::{is_digit, is_space, not_line_ending, Err, ErrorKind, IResult, Needed};
 
 use std::str;
 
@@ -28,38 +28,38 @@ fn eof(input: &[u8]) -> IResult<&[u8], ()> {
 pub fn specification(input: &str) -> Result<Vec<Defn>, String> {
     match spec(input.as_bytes()) {
         Done(_, spec) => Ok(spec),
-        Error(Err::Position(kind, input)) => {
-            Err(format!(
-                "{:?}: {}",
-                kind,
-                String::from(str::from_utf8(input).unwrap())
-            ))
-        }
+        Error(Err::Position(kind, input)) => Err(format!(
+            "{:?}: {}",
+            kind,
+            String::from(str::from_utf8(input).unwrap())
+        )),
         Error(err) => Err(format!("Error: {:?}", err)),
         Incomplete(need) => Err(format!("Incomplete {:?}", need)),
     }
 }
 
-named!(spec< Vec<Defn> >,
-    do_parse!(
-        opt!(directive) >>
-        defns: many0!(definition) >>
-        spaces >> eof >>
-        (defns))
+named!(
+    spec<Vec<Defn>>,
+    do_parse!(opt!(directive) >> defns: many0!(definition) >> spaces >> eof >> (defns))
 );
 
 #[test]
 fn test_spec() {
-    assert_eq!(spec(&b"#include <foo>"[..]),
-               Done(&b""[..], vec!()));
+    assert_eq!(spec(&b"#include <foo>"[..]), Done(&b""[..], vec!()));
 
-    assert_eq!(spec(&b"// hello\n#include <foo>"[..]),
-               Done(&b""[..], vec!()));
+    assert_eq!(
+        spec(&b"// hello\n#include <foo>"[..]),
+        Done(&b""[..], vec!())
+    );
 
-    assert_eq!(spec(&b"#include <foo>\ntypedef int foo;"[..]),
-               Done(&b""[..], vec!(Defn::typesyn("foo", Type::Int))));
+    assert_eq!(
+        spec(&b"#include <foo>\ntypedef int foo;"[..]),
+        Done(&b""[..], vec!(Defn::typesyn("foo", Type::Int)))
+    );
 
-    assert_eq!(spec(&br#"
+    assert_eq!(
+        spec(
+            &br#"
 /* test file */
 #define foo bar
 const mip = 123;
@@ -71,19 +71,37 @@ struct bar {
 };
 #include "other"
 enum bop { a = 2, b = 1 };
-"#[..]),
-               Done(&b""[..],
-                    vec!(Defn::constant("mip", 123),
-                         Defn::typesyn("foo", Type::Int),
-                         Defn::typespec("bar", Type::Struct(vec!(Decl::named("a", Type::Int),
-                                                                               Decl::named("b", Type::Int)))),
-                         Defn::typespec("bop", Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(2))),
-                                                                             EnumDefn::new("b", Some(Value::Const(1)))))))));
+"#[..]
+        ),
+        Done(
+            &b""[..],
+            vec!(
+                Defn::constant("mip", 123),
+                Defn::typesyn("foo", Type::Int),
+                Defn::typespec(
+                    "bar",
+                    Type::Struct(vec!(
+                        Decl::named("a", Type::Int),
+                        Decl::named("b", Type::Int)
+                    ))
+                ),
+                Defn::typespec(
+                    "bop",
+                    Type::Enum(vec!(
+                        EnumDefn::new("a", Some(Value::Const(2))),
+                        EnumDefn::new("b", Some(Value::Const(1)))
+                    ))
+                )
+            )
+        )
+    );
 }
 
-named!(definition<Defn>,
-       alt!(type_def => { |t| t } |
-            const_def => { |c| c }));
+named!(
+    definition<Defn>,
+    alt!(type_def => { |t| t } |
+            const_def => { |c| c })
+);
 
 fn is_hexdigit(ch: u8) -> bool {
     match ch as char {
@@ -112,46 +130,53 @@ fn digit<F: Fn(u8) -> bool>(input: &[u8], isdigit: F) -> IResult<&[u8], &[u8]> {
     Incomplete(Needed::Unknown)
 }
 
-named!(lbrace,  preceded!(spaces, apply!(ctag, "{")));
-named!(rbrace,  preceded!(spaces, apply!(ctag, "}")));
-named!(lbrack,  preceded!(spaces, apply!(ctag, "[")));
-named!(rbrack,  preceded!(spaces, apply!(ctag, "]")));
-named!(lparen,  preceded!(spaces, apply!(ctag, "(")));
-named!(rparen,  preceded!(spaces, apply!(ctag, ")")));
-named!(lt,      preceded!(spaces, apply!(ctag, "<")));
-named!(gt,      preceded!(spaces, apply!(ctag, ">")));
-named!(colon,   preceded!(spaces, apply!(ctag, ":")));
-named!(semi,    preceded!(spaces, apply!(ctag, ";")));
-named!(comma,   preceded!(spaces, apply!(ctag, ",")));
-named!(eq,      preceded!(spaces, apply!(ctag, "=")));
-named!(star,    preceded!(spaces, apply!(ctag, "*")));
+named!(lbrace, preceded!(spaces, apply!(ctag, "{")));
+named!(rbrace, preceded!(spaces, apply!(ctag, "}")));
+named!(lbrack, preceded!(spaces, apply!(ctag, "[")));
+named!(rbrack, preceded!(spaces, apply!(ctag, "]")));
+named!(lparen, preceded!(spaces, apply!(ctag, "(")));
+named!(rparen, preceded!(spaces, apply!(ctag, ")")));
+named!(lt, preceded!(spaces, apply!(ctag, "<")));
+named!(gt, preceded!(spaces, apply!(ctag, ">")));
+named!(colon, preceded!(spaces, apply!(ctag, ":")));
+named!(semi, preceded!(spaces, apply!(ctag, ";")));
+named!(comma, preceded!(spaces, apply!(ctag, ",")));
+named!(eq, preceded!(spaces, apply!(ctag, "=")));
+named!(star, preceded!(spaces, apply!(ctag, "*")));
 
-named!(hexnumber<i64>,
+named!(
+    hexnumber<i64>,
     do_parse!(
-        apply!(ctag, "0x") >>
-        val: map_res!(apply!(digit, is_hexdigit), str::from_utf8) >>
-        (i64::from_str_radix(val, 16).unwrap())
+        apply!(ctag, "0x")
+            >> val: map_res!(apply!(digit, is_hexdigit), str::from_utf8)
+            >> (i64::from_str_radix(val, 16).unwrap())
     )
 );
 
-named!(octnumber<i64>,
+named!(
+    octnumber<i64>,
     do_parse!(
-        sign: opt!(apply!(ctag, "-")) >>
-        apply!(ctag, "0") >>
-        val: opt!(map_res!(apply!(digit, is_octdigit), str::from_utf8)) >>
-        (i64::from_str_radix(val.unwrap_or("0"), 8).unwrap() * (if sign.is_some() { -1 } else { 1 }))
+        sign: opt!(apply!(ctag, "-"))
+            >> apply!(ctag, "0")
+            >> val: opt!(map_res!(apply!(digit, is_octdigit), str::from_utf8))
+            >> (i64::from_str_radix(val.unwrap_or("0"), 8).unwrap()
+                * (if sign.is_some() { -1 } else { 1 }))
     )
 );
 
-named!(decnumber<i64>,
+named!(
+    decnumber<i64>,
     do_parse!(
-        sign: opt!(apply!(ctag, "-")) >>
-        val: map_res!(apply!(digit, is_digit), str::from_utf8) >>
-        (i64::from_str_radix(val, 10).unwrap() * (if sign.is_some() { -1 } else { 1 }))
+        sign: opt!(apply!(ctag, "-"))
+            >> val: map_res!(apply!(digit, is_digit), str::from_utf8)
+            >> (i64::from_str_radix(val, 10).unwrap() * (if sign.is_some() { -1 } else { 1 }))
     )
 );
 
-named!(number<i64>, preceded!(spaces, alt!(hexnumber | octnumber | decnumber)));
+named!(
+    number<i64>,
+    preceded!(spaces, alt!(hexnumber | octnumber | decnumber))
+);
 
 #[test]
 fn test_nums() {
@@ -203,15 +228,16 @@ fn token(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 macro_rules! kw {
-    ($fnname:ident, $kw:expr) => (
+    ($fnname:ident, $kw:expr) => {
         fn $fnname(input: &[u8]) -> IResult<&[u8], ()> {
             match token(input) {
-                Done(rest, val) =>
+                Done(rest, val) => {
                     if val == $kw {
                         Done(rest, ())
                     } else {
                         Error(Err::Position(ErrorKind::Custom(0), input))
-                    },
+                    }
+                }
                 Error(e) => Error(e),
                 Incomplete(_) => {
                     // If its either incomplete but longer that what we're looking for, or what we
@@ -221,9 +247,10 @@ macro_rules! kw {
                     } else {
                         Incomplete(Needed::Size($kw.len() - input.len()))
                     }
-                },
+                }
             }
-        });
+        }
+    };
 }
 
 kw!(kw_bool, b"bool");
@@ -248,32 +275,52 @@ kw!(kw_union, b"union");
 kw!(kw_unsigned, b"unsigned");
 kw!(kw_void, b"void");
 
-named!(keyword<()>,
-       alt!(kw_bool |
-            kw_case |
-            kw_const |
-            kw_default |
-            kw_double |
-            kw_enum |
-            kw_float |
-            kw_hyper |
-            kw_int |
-            kw_opaque |
-            kw_quadruple |
-            kw_string |
-            kw_struct |
-            kw_switch |
-            kw_typedef |
-            kw_union |
-            kw_unsigned |
-            kw_void));
+named!(
+    keyword<()>,
+    alt!(
+        kw_bool
+            | kw_case
+            | kw_const
+            | kw_default
+            | kw_double
+            | kw_enum
+            | kw_float
+            | kw_hyper
+            | kw_int
+            | kw_opaque
+            | kw_quadruple
+            | kw_string
+            | kw_struct
+            | kw_switch
+            | kw_typedef
+            | kw_union
+            | kw_unsigned
+            | kw_void
+    )
+);
 
 #[test]
 fn test_kw() {
-    let kws = vec!("bool", "case", "const", "default",
-                   "double", "enum", "float", "hyper", "int",
-                   "opaque", "quadruple", "string", "struct",
-                   "switch", "typedef", "union", "unsigned", "void");
+    let kws = vec![
+        "bool",
+        "case",
+        "const",
+        "default",
+        "double",
+        "enum",
+        "float",
+        "hyper",
+        "int",
+        "opaque",
+        "quadruple",
+        "string",
+        "struct",
+        "switch",
+        "typedef",
+        "union",
+        "unsigned",
+        "void",
+    ];
 
     for k in &kws {
         println!("testing \"{}\"", k);
@@ -307,24 +354,21 @@ fn test_kw() {
         }
     }
 
-    for nk in &vec!("boo", "in", "inx", "booll") {
+    for nk in &vec!["boo", "in", "inx", "booll"] {
         match keyword((*nk).as_bytes()) {
             e @ Done(..) => panic!("{:?} => {:?}", nk, e),
             e => println!("{:?} => {:?}", nk, e),
         }
     }
-
 }
 
 fn ident(input: &[u8]) -> IResult<&[u8], &str> {
     // Grab an identifier and make sure it isn't a keyword
     match token(input) {
-        Done(rest, val) => {
-            match keyword(input) {
-                Done(..) => Error(Err::Position(ErrorKind::Custom(1), val)),
-                Error(..) | Incomplete(..) => Done(rest, str::from_utf8(val).unwrap()),
-            }
-        }
+        Done(rest, val) => match keyword(input) {
+            Done(..) => Error(Err::Position(ErrorKind::Custom(1), val)),
+            Error(..) | Incomplete(..) => Done(rest, str::from_utf8(val).unwrap()),
+        },
         Error(e) => Error(e),
         Incomplete(need) => Incomplete(need),
     }
@@ -334,70 +378,96 @@ fn ident(input: &[u8]) -> IResult<&[u8], &str> {
 fn test_ident() {
     assert_eq!(ident(&b"foo "[..]), Done(&b" "[..], "foo"));
     assert_eq!(ident(&b" foo "[..]), Done(&b" "[..], "foo"));
-    assert_eq!(ident(&b" bool "[..]), Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..])));
+    assert_eq!(
+        ident(&b" bool "[..]),
+        Error(Err::Position(ErrorKind::Custom(1), &b"bool"[..]))
+    );
 }
 
-named!(blockcomment<()>,
-    do_parse!(apply!(ctag, "/*") >> take_until_and_consume!(&b"*/"[..]) >> (())));
+named!(
+    blockcomment<()>,
+    do_parse!(apply!(ctag, "/*") >> take_until_and_consume!(&b"*/"[..]) >> (()))
+);
 
 // `linecomment`, and `directive` end at eol, but do not consume it
-named!(linecomment<()>,
-    do_parse!(
-        apply!(ctag, "//") >> opt!(not_line_ending) >> peek!(alt!(eol | eof)) >> (())
-    )
+named!(
+    linecomment<()>,
+    do_parse!(apply!(ctag, "//") >> opt!(not_line_ending) >> peek!(alt!(eol | eof)) >> (()))
 );
 
 // Directive should always follow eol unless its the first thing in the file
-named!(directive<()>,
+named!(
+    directive<()>,
     do_parse!(
-        opt!(whitespace) >>
-        alt!(
-            apply!(ctag, "#") | 
-            apply!(ctag, "%")) >>
-        opt!(not_line_ending) >>
-        peek!(alt!(eol | eof)) >> (())
+        opt!(whitespace)
+            >> alt!(apply!(ctag, "#") | apply!(ctag, "%"))
+            >> opt!(not_line_ending)
+            >> peek!(alt!(eol | eof))
+            >> (())
     )
 );
 
 #[test]
 fn test_comments() {
     assert_eq!(blockcomment(&b"/* foo */bar"[..]), Done(&b"bar"[..], ()));
-    assert_eq!(blockcomment(&b"/* blip /* foo */bar"[..]), Done(&b"bar"[..], ()));
-    assert_eq!(blockcomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
+    assert_eq!(
+        blockcomment(&b"/* blip /* foo */bar"[..]),
+        Done(&b"bar"[..], ())
+    );
+    assert_eq!(
+        blockcomment(&b"x"[..]),
+        Error(Err::Position(ErrorKind::Tag, &b"x"[..]))
+    );
     assert_eq!(linecomment(&b"// foo\nbar"[..]), Done(&b"\nbar"[..], ()));
     assert_eq!(linecomment(&b"// foo bar\n "[..]), Done(&b"\n "[..], ()));
-    assert_eq!(linecomment(&b"x"[..]), Error(Err::Position(ErrorKind::Tag, &b"x"[..])));
+    assert_eq!(
+        linecomment(&b"x"[..]),
+        Error(Err::Position(ErrorKind::Tag, &b"x"[..]))
+    );
 
     assert_eq!(directive(&b"#define foo bar\n "[..]), Done(&b"\n "[..], ()));
-    assert_eq!(directive(&b"%#define foo bar\n "[..]), Done(&b"\n "[..], ()));
+    assert_eq!(
+        directive(&b"%#define foo bar\n "[..]),
+        Done(&b"\n "[..], ())
+    );
 
-    assert_eq!(directive(&b"x"[..]), Error(Err::Position(ErrorKind::Alt, &b"x"[..])));
+    assert_eq!(
+        directive(&b"x"[..]),
+        Error(Err::Position(ErrorKind::Alt, &b"x"[..]))
+    );
 
-    assert_eq!(preceded!(&b"\n#define x\n"[..], eol, directive),
-               Done(&b"\n"[..], ()));
+    assert_eq!(
+        preceded!(&b"\n#define x\n"[..], eol, directive),
+        Done(&b"\n"[..], ())
+    );
 }
 
-named!(eol<()>, map!(alt!(apply!(ctag, "\n") |
-                          apply!(ctag, "\r\n") |
-                          apply!(ctag, "\u{2028}") |
-                          apply!(ctag, "\u{2029}")),
-                     ignore)
-       );
+named!(
+    eol<()>,
+    map!(
+        alt!(
+            apply!(ctag, "\n")
+                | apply!(ctag, "\r\n")
+                | apply!(ctag, "\u{2028}")
+                | apply!(ctag, "\u{2029}")
+        ),
+        ignore
+    )
+);
 
-named!(whitespace<()>,
-       map!(take_while1!(is_space), ignore));
+named!(whitespace<()>, map!(take_while1!(is_space), ignore));
 
 // `spaces` consumes spans of space and tab characters interpolated
 // with comments, c-preproc and passthrough lines.
-named!(spaces<()>,
+named!(
+    spaces<()>,
     map!(
-        many0!(
-            alt!( do_parse!(eol >> opt!(complete!(directive)) >> (()))
+        many0!(alt!(
+            do_parse!(eol >> opt!(complete!(directive)) >> (()))
                 | whitespace
                 | blockcomment
                 | linecomment
-                )
-        ),
+        )),
         ignore
     )
 );
@@ -415,7 +485,10 @@ fn test_spaces() {
     assert_eq!(eol(&b"\r\nx"[..]), Done(&b"x"[..], ()));
     assert_eq!(eol(&b"\nx"[..]), Done(&b"x"[..], ()));
 
-    assert_eq!(whitespace(&b"x"[..]), Error(Err::Position(ErrorKind::TakeWhile1, &b"x"[..])));
+    assert_eq!(
+        whitespace(&b"x"[..]),
+        Error(Err::Position(ErrorKind::TakeWhile1, &b"x"[..]))
+    );
     assert_eq!(whitespace(&b" x"[..]), Done(&b"x"[..], ()));
     assert_eq!(whitespace(&b"  x"[..]), Done(&b"x"[..], ()));
     assert_eq!(whitespace(&b"\tx"[..]), Done(&b"x"[..], ()));
@@ -434,137 +507,198 @@ fn test_spaces() {
     assert_eq!(spaces(&b"\n%foo a b\n       x"[..]), Done(&b"x"[..], ()));
 }
 
-named!(enum_type_spec< Vec<EnumDefn> >,
-       preceded!(kw_enum, enum_body));
+named!(enum_type_spec<Vec<EnumDefn>>, preceded!(kw_enum, enum_body));
 
-named!(enum_body< Vec<EnumDefn> >,
-    do_parse!(
-        lbrace >>
-        b: separated_nonempty_list!(comma, enum_assign) >>
-        rbrace >>
-        (b)
+named!(
+    enum_body<Vec<EnumDefn>>,
+    do_parse!(lbrace >> b: separated_nonempty_list!(comma, enum_assign) >> rbrace >> (b))
+);
+
+named!(
+    enum_assign<EnumDefn>,
+    do_parse!(id: ident >> v: opt!(preceded!(eq, value)) >> (EnumDefn::new(id, v)))
+);
+
+named!(
+    value<Value>,
+    alt!(number => { |c| Value::Const(c) } |
+    ident => { |id| Value::ident(id) }
     )
 );
 
-named!(enum_assign<EnumDefn>,
+named!(
+    struct_type_spec<Vec<Decl>>,
+    preceded!(kw_struct, struct_body)
+);
+
+named!(
+    struct_body<Vec<Decl>>,
+    do_parse!(lbrace >> decls: many1!(terminated!(declaration, semi)) >> rbrace >> (decls))
+);
+
+named!(
+    union_type_spec<(Decl, Vec<UnionCase>, Option<Decl>)>,
+    do_parse!(kw_union >> body: union_body >> (body))
+);
+
+named!(
+    union_body<(Decl, Vec<UnionCase>, Option<Decl>)>,
     do_parse!(
-        id: ident >>
-        v: opt!(preceded!(eq, value)) >>
-        (EnumDefn::new(id, v))
+        kw_switch
+            >> lparen
+            >> decl: declaration
+            >> rparen
+            >> lbrace
+            >> ucss: many1!(union_case)
+            >> dfl: opt!(union_default)
+            >> rbrace
+            >> (decl, ucss.into_iter().flat_map(|v| v).collect(), dfl)
     )
 );
 
-named!(value<Value>,
-       alt!(number => { |c| Value::Const(c) } |
-            ident => { |id| Value::ident(id) }
-            )
-       );
-
-named!(struct_type_spec< Vec<Decl> >,
-       preceded!(kw_struct, struct_body));
-
-named!(struct_body< Vec<Decl> >,
+named!(
+    union_case<Vec<UnionCase>>,
     do_parse!(
-        lbrace >>
-        decls: many1!(terminated!(declaration, semi)) >>
-        rbrace >>
-        (decls)
+        vs: many1!(do_parse!(kw_case >> v: value >> colon >> (v)))
+            >> decl: declaration
+            >> semi
+            >> (vs.into_iter().map(|v| UnionCase(v, decl.clone())).collect())
     )
 );
 
-named!(union_type_spec<(Decl, Vec<UnionCase>, Option<Decl>)>,
-    do_parse!(kw_union >> body:union_body >> (body)));
-
-named!(union_body<(Decl, Vec<UnionCase>, Option<Decl>)>,
-    do_parse!(
-        kw_switch >> lparen >> decl:declaration >> rparen >>
-        lbrace >>
-        ucss: many1!(union_case) >>
-        dfl: opt!(union_default) >>
-        rbrace >>
-        (decl, ucss.into_iter().flat_map(|v| v).collect(), dfl)
-    )
+named!(
+    union_default<Decl>,
+    do_parse!(kw_default >> colon >> decl: declaration >> semi >> (decl))
 );
 
-named!(union_case< Vec<UnionCase> >,
-    do_parse!(
-        vs: many1!(do_parse!(kw_case >> v:value >> colon >> (v))) >>
-        decl: declaration >> semi >>
-        (vs.into_iter().map(|v| UnionCase(v, decl.clone())).collect())
-    )
-);
-
-named!(union_default<Decl>,
-    do_parse!(
-        kw_default >> colon >>
-        decl: declaration >> semi >>
-        (decl)
-    )
-);
-
-named!(declaration<Decl>,
+named!(
+    declaration<Decl>,
     alt!(kw_void => { |_| Decl::Void } |
-        nonvoid_declaration));
+        nonvoid_declaration)
+);
 
-named!(nonvoid_declaration<Decl>,
+named!(
+    nonvoid_declaration<Decl>,
     alt!(
-        do_parse!(ty: array_type_spec >> id: ident >> lbrack >> sz:value >> rbrack >>
-            (Decl::named(id, Type::array(ty, sz))))
-    |   do_parse!(ty: array_type_spec >> id: ident >> lt >> sz:opt!(value) >> gt >>
-            (Decl::named(id, Type::flex(ty, sz))))
-    |   do_parse!(ty: type_spec >> star >> id: ident >>
-            (Decl::named(id, Type::option(ty))))
-    |   do_parse!(ty: type_spec >> id: ident >>
-            (Decl::named(id, ty)))
+        do_parse!(
+            ty: array_type_spec
+                >> id: ident
+                >> lbrack
+                >> sz: value
+                >> rbrack
+                >> (Decl::named(id, Type::array(ty, sz)))
+        ) | do_parse!(
+            ty: array_type_spec
+                >> id: ident
+                >> lt
+                >> sz: opt!(value)
+                >> gt
+                >> (Decl::named(id, Type::flex(ty, sz)))
+        ) | do_parse!(ty: type_spec >> star >> id: ident >> (Decl::named(id, Type::option(ty))))
+            | do_parse!(ty: type_spec >> id: ident >> (Decl::named(id, ty)))
     )
 );
 
-named!(array_type_spec<Type>,
-       alt!(kw_opaque => { |_| Type::Opaque } |
-            kw_string => { |_| Type::String } |
-            type_spec
-            )
-       );
+named!(
+    array_type_spec<Type>,
+    alt!(kw_opaque => { |_| Type::Opaque } |
+    kw_string => { |_| Type::String } |
+    type_spec
+    )
+);
 
 #[test]
 fn test_decls() {
     assert_eq!(declaration(&b"void "[..]), Done(&b" "[..], Decl::Void));
 
-    assert_eq!(declaration(&b"int foo;"[..]), Done(&b";"[..], Decl::named("foo", Type::Int)));
-    assert_eq!(declaration(&b"int foo[123] "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Array(Box::new(Type::Int), Value::Const(123)))));
+    assert_eq!(
+        declaration(&b"int foo;"[..]),
+        Done(&b";"[..], Decl::named("foo", Type::Int))
+    );
+    assert_eq!(
+        declaration(&b"int foo[123] "[..]),
+        Done(
+            &b" "[..],
+            Decl::named("foo", Type::Array(Box::new(Type::Int), Value::Const(123)))
+        )
+    );
 
-    assert_eq!(declaration(&b"int foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Int), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"int foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Int), None))));
-    assert_eq!(declaration(&b"int *foo "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Option(Box::new(Type::Int)))));
+    assert_eq!(
+        declaration(&b"int foo<123> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named(
+                "foo",
+                Type::Flex(Box::new(Type::Int), Some(Value::Const(123)))
+            )
+        )
+    );
+    assert_eq!(
+        declaration(&b"int foo<> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named("foo", Type::Flex(Box::new(Type::Int), None))
+        )
+    );
+    assert_eq!(
+        declaration(&b"int *foo "[..]),
+        Done(
+            &b" "[..],
+            Decl::named("foo", Type::Option(Box::new(Type::Int)))
+        )
+    );
 
-    assert_eq!(declaration(&b"opaque foo[123] "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Array(Box::new(Type::Opaque), Value::Const(123)))));
-    assert_eq!(declaration(&b"opaque foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Opaque), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"opaque foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::Opaque), None))));
+    assert_eq!(
+        declaration(&b"opaque foo[123] "[..]),
+        Done(
+            &b" "[..],
+            Decl::named(
+                "foo",
+                Type::Array(Box::new(Type::Opaque), Value::Const(123))
+            )
+        )
+    );
+    assert_eq!(
+        declaration(&b"opaque foo<123> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named(
+                "foo",
+                Type::Flex(Box::new(Type::Opaque), Some(Value::Const(123)))
+            )
+        )
+    );
+    assert_eq!(
+        declaration(&b"opaque foo<> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named("foo", Type::Flex(Box::new(Type::Opaque), None))
+        )
+    );
 
-    assert_eq!(declaration(&b"string foo<123> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::String), Some(Value::Const(123))))));
-    assert_eq!(declaration(&b"string foo<> "[..]),
-               Done(&b" "[..], Decl::named("foo",
-                                           Type::Flex(Box::new(Type::String), None))));
+    assert_eq!(
+        declaration(&b"string foo<123> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named(
+                "foo",
+                Type::Flex(Box::new(Type::String), Some(Value::Const(123)))
+            )
+        )
+    );
+    assert_eq!(
+        declaration(&b"string foo<> "[..]),
+        Done(
+            &b" "[..],
+            Decl::named("foo", Type::Flex(Box::new(Type::String), None))
+        )
+    );
 }
 
-named!(type_spec<Type>,
-    preceded!(spaces,
+named!(
+    type_spec<Type>,
+    preceded!(
+        spaces,
         alt!(
             do_parse!(kw_unsigned >> kw_int >> (Type::UInt)) |
             do_parse!(kw_unsigned >> kw_long >> (Type::UInt)) |          // backwards compat with rpcgen
@@ -596,116 +730,224 @@ named!(type_spec<Type>,
 #[test]
 fn test_type() {
     assert_eq!(type_spec(&b"int "[..]), Done(&b" "[..], Type::Int));
-    assert_eq!(type_spec(&b"unsigned int "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned\nint "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned/* foo */int "[..]), Done(&b" "[..], Type::UInt));
-    assert_eq!(type_spec(&b"unsigned//\nint "[..]), Done(&b" "[..], Type::UInt));
+    assert_eq!(
+        type_spec(&b"unsigned int "[..]),
+        Done(&b" "[..], Type::UInt)
+    );
+    assert_eq!(
+        type_spec(&b"unsigned\nint "[..]),
+        Done(&b" "[..], Type::UInt)
+    );
+    assert_eq!(
+        type_spec(&b"unsigned/* foo */int "[..]),
+        Done(&b" "[..], Type::UInt)
+    );
+    assert_eq!(
+        type_spec(&b"unsigned//\nint "[..]),
+        Done(&b" "[..], Type::UInt)
+    );
 
-    assert_eq!(type_spec(&b"unsigned hyper "[..]), Done(&b" "[..], Type::UHyper));
+    assert_eq!(
+        type_spec(&b"unsigned hyper "[..]),
+        Done(&b" "[..], Type::UHyper)
+    );
 
-    assert_eq!(type_spec(&b"unsigned char "[..]), Done(&b" "[..],
-        Type::Ident("u8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
-    assert_eq!(type_spec(&b"unsigned short "[..]), Done(&b" "[..], Type::UInt));
+    assert_eq!(
+        type_spec(&b"unsigned char "[..]),
+        Done(
+            &b" "[..],
+            Type::Ident("u8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))
+        )
+    );
+    assert_eq!(
+        type_spec(&b"unsigned short "[..]),
+        Done(&b" "[..], Type::UInt)
+    );
 
     assert_eq!(type_spec(&b" hyper "[..]), Done(&b" "[..], Type::Hyper));
     assert_eq!(type_spec(&b" double "[..]), Done(&b" "[..], Type::Double));
-    assert_eq!(type_spec(&b"// thing\nquadruple "[..]), Done(&b" "[..], Type::Quadruple));
-    assert_eq!(type_spec(&b"// thing\n bool "[..]), Done(&b" "[..], Type::Bool));
+    assert_eq!(
+        type_spec(&b"// thing\nquadruple "[..]),
+        Done(&b" "[..], Type::Quadruple)
+    );
+    assert_eq!(
+        type_spec(&b"// thing\n bool "[..]),
+        Done(&b" "[..], Type::Bool)
+    );
 
-    assert_eq!(type_spec(&b"char "[..]), Done(&b" "[..],
-        Type::Ident("i8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))));
+    assert_eq!(
+        type_spec(&b"char "[..]),
+        Done(
+            &b" "[..],
+            Type::Ident("i8".into(), Some(COPY | CLONE | EQ | PARTIALEQ | DEBUG))
+        )
+    );
 
     assert_eq!(type_spec(&b"short "[..]), Done(&b" "[..], Type::Int));
 
+    assert_eq!(
+        type_spec(&b"struct { int a; int b; } "[..]),
+        Done(
+            &b" "[..],
+            Type::Struct(vec!(
+                Decl::named("a", Type::Int),
+                Decl::named("b", Type::Int)
+            ))
+        )
+    );
 
-    assert_eq!(type_spec(&b"struct { int a; int b; } "[..]),
-               Done(&b" "[..],
-                    Type::Struct(vec!(Decl::named("a", Type::Int),
-                                      Decl::named("b", Type::Int)))));
-
-    assert_eq!(type_spec(&b"union switch (int a) { case 1: void; case 2: int a; default: void; } "[..]),
-                         Done(&b" "[..],
-                              Type::Union(Box::new(Decl::named("a", Type::Int)),
-                                          vec!(UnionCase(Value::Const(1), Decl::Void),
-                                               UnionCase(Value::Const(2), Decl::named("a", Type::Int))),
-                                          Some(Box::new(Decl::Void)))));
+    assert_eq!(
+        type_spec(&b"union switch (int a) { case 1: void; case 2: int a; default: void; } "[..]),
+        Done(
+            &b" "[..],
+            Type::Union(
+                Box::new(Decl::named("a", Type::Int)),
+                vec!(
+                    UnionCase(Value::Const(1), Decl::Void),
+                    UnionCase(Value::Const(2), Decl::named("a", Type::Int))
+                ),
+                Some(Box::new(Decl::Void))
+            )
+        )
+    );
 }
 
 #[test]
 fn test_enum() {
-    assert_eq!(type_spec(&b"enum { a, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", None),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+    assert_eq!(
+        type_spec(&b"enum { a, b, c } "[..]),
+        Done(
+            &b" "[..],
+            Type::Enum(vec!(
+                EnumDefn::new("a", None),
+                EnumDefn::new("b", None),
+                EnumDefn::new("c", None)
+            ))
+        )
+    );
 
-    assert_eq!(type_spec(&b"enum { a = 1, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::Const(1))),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+    assert_eq!(
+        type_spec(&b"enum { a = 1, b, c } "[..]),
+        Done(
+            &b" "[..],
+            Type::Enum(vec!(
+                EnumDefn::new("a", Some(Value::Const(1))),
+                EnumDefn::new("b", None),
+                EnumDefn::new("c", None)
+            ))
+        )
+    );
 
-    assert_eq!(type_spec(&b"enum { a = Bar, b, c } "[..]),
-               Done(&b" "[..],
-                    Type::Enum(vec!(EnumDefn::new("a", Some(Value::ident("Bar"))),
-                                    EnumDefn::new("b", None),
-                                    EnumDefn::new("c", None)))));
+    assert_eq!(
+        type_spec(&b"enum { a = Bar, b, c } "[..]),
+        Done(
+            &b" "[..],
+            Type::Enum(vec!(
+                EnumDefn::new("a", Some(Value::ident("Bar"))),
+                EnumDefn::new("b", None),
+                EnumDefn::new("c", None)
+            ))
+        )
+    );
 
-    assert_eq!(type_spec(&b"enum { } "[..]),
-               Error(Err::Position(ErrorKind::Alt, &b"enum { } "[..])));
+    assert_eq!(
+        type_spec(&b"enum { } "[..]),
+        Error(Err::Position(ErrorKind::Alt, &b"enum { } "[..]))
+    );
 }
 
-named!(const_def<Defn>,
-    do_parse!(
-        kw_const >> id:ident >> eq >> v:number >> semi >>
-            (Defn::constant(id, v)))
+named!(
+    const_def<Defn>,
+    do_parse!(kw_const >> id: ident >> eq >> v: number >> semi >> (Defn::constant(id, v)))
 );
 
 #[test]
 fn test_const() {
-    assert_eq!(const_def(&b"const foo = 123;"[..]), Done(&b""[..], Defn::constant("foo", 123)));
+    assert_eq!(
+        const_def(&b"const foo = 123;"[..]),
+        Done(&b""[..], Defn::constant("foo", 123))
+    );
 }
 
-named!(type_def<Defn>,
+named!(
+    type_def<Defn>,
     alt!(
-        do_parse!(kw_typedef >> decl: nonvoid_declaration >> semi >>
-            ({
-                match decl.clone() {
-                    Decl::Named(name, ty) => {
-                        if ty.is_syn() {
-                            Defn::typesyn(name, ty)
-                        } else {
-                            Defn::typespec(name, ty)
+        do_parse!(
+            kw_typedef
+                >> decl: nonvoid_declaration
+                >> semi
+                >> ({
+                    match decl.clone() {
+                        Decl::Named(name, ty) => {
+                            if ty.is_syn() {
+                                Defn::typesyn(name, ty)
+                            } else {
+                                Defn::typespec(name, ty)
+                            }
                         }
-                    },
-                    Decl::Void => panic!("void non-void declaration?"),
-                }
-            })
+                        Decl::Void => panic!("void non-void declaration?"),
+                    }
+                })
+        ) | do_parse!(
+            kw_enum >> id: ident >> e: enum_body >> semi >> (Defn::typespec(id, Type::Enum(e)))
+        ) | do_parse!(
+            kw_struct
+                >> id: ident
+                >> s: struct_body
+                >> semi
+                >> (Defn::typespec(id, Type::Struct(s)))
+        ) | do_parse!(
+            kw_union >> id: ident >> u: union_body >> semi >> (Defn::typespec(id, Type::union(u)))
         )
-    |   do_parse!(kw_enum >> id:ident >> e:enum_body >> semi >> (Defn::typespec(id, Type::Enum(e))))
-    |   do_parse!(kw_struct >> id:ident >> s:struct_body >> semi >> (Defn::typespec(id, Type::Struct(s))))
-    |   do_parse!(kw_union >> id:ident >> u:union_body >> semi >> (Defn::typespec(id, Type::union(u))))
     )
 );
 
 #[test]
 fn test_typedef() {
-    assert_eq!(type_def(&b"typedef int foo;"[..]),
-               Done(&b""[..], Defn::typesyn("foo", Type::Int)));
-    assert_eq!(type_def(&b"typedef unsigned int foo;"[..]),
-               Done(&b""[..], Defn::typesyn("foo", Type::UInt)));
-    assert_eq!(type_def(&b"typedef int foo<>;"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Flex(Box::new(Type::Int), None))));
+    assert_eq!(
+        type_def(&b"typedef int foo;"[..]),
+        Done(&b""[..], Defn::typesyn("foo", Type::Int))
+    );
+    assert_eq!(
+        type_def(&b"typedef unsigned int foo;"[..]),
+        Done(&b""[..], Defn::typesyn("foo", Type::UInt))
+    );
+    assert_eq!(
+        type_def(&b"typedef int foo<>;"[..]),
+        Done(
+            &b""[..],
+            Defn::typespec("foo", Type::Flex(Box::new(Type::Int), None))
+        )
+    );
 
-    assert_eq!(type_def(&b"enum foo { a };"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Enum(vec!(EnumDefn::new("a", None))))));
+    assert_eq!(
+        type_def(&b"enum foo { a };"[..]),
+        Done(
+            &b""[..],
+            Defn::typespec("foo", Type::Enum(vec!(EnumDefn::new("a", None))))
+        )
+    );
 
-    assert_eq!(type_def(&b"struct foo { int a; };"[..]),
-               Done(&b""[..], Defn::typespec("foo", Type::Struct(vec!(Decl::named("a", Type::Int))))));
+    assert_eq!(
+        type_def(&b"struct foo { int a; };"[..]),
+        Done(
+            &b""[..],
+            Defn::typespec("foo", Type::Struct(vec!(Decl::named("a", Type::Int))))
+        )
+    );
 
-    assert_eq!(type_def(&b"union foo switch(int a) { case 1: int a; };"[..]),
-               Done(&b""[..], Defn::typespec("foo",
-                                             Type::Union(Box::new(Decl::named("a", Type::Int)),
-                                                         vec!(UnionCase(Value::Const(1), Decl::named("a", Type::Int))),
-                                                         None))));
+    assert_eq!(
+        type_def(&b"union foo switch(int a) { case 1: int a; };"[..]),
+        Done(
+            &b""[..],
+            Defn::typespec(
+                "foo",
+                Type::Union(
+                    Box::new(Decl::named("a", Type::Int)),
+                    vec!(UnionCase(Value::Const(1), Decl::named("a", Type::Int))),
+                    None
+                )
+            )
+        )
+    );
 }

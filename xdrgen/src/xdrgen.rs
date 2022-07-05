@@ -1,12 +1,12 @@
 #![crate_type = "bin"]
 
-extern crate xdrgen;
-extern crate env_logger;
 extern crate clap;
+extern crate env_logger;
+extern crate xdrgen;
 
 use std::fs::File;
-use std::io::{BufReader, Write};
 use std::io::{stderr, stdin, stdout};
+use std::io::{BufReader, Write};
 
 use clap::App;
 

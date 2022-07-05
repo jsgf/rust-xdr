@@ -1,13 +1,15 @@
-extern crate xdr_codec;
 extern crate quickcheck;
+extern crate xdr_codec;
 
-use std::io::Cursor;
 use std::fmt::Debug;
+use std::io::Cursor;
 use std::iter;
 
-use xdr_codec::{Error, ErrorKind, Pack, Unpack, pack_array, pack_opaque_array, padding,
-                unpack_array, unpack_opaque_array};
-use quickcheck::{Arbitrary, quickcheck};
+use quickcheck::{quickcheck, Arbitrary};
+use xdr_codec::{
+    pack_array, pack_opaque_array, padding, unpack_array, unpack_opaque_array, Error, ErrorKind,
+    Pack, Unpack,
+};
 
 // Output of packing is a multiple of 4
 fn pack<T>(v: T) -> bool
@@ -201,8 +203,8 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
 
     // unpack rxsize elements
     let rsz = match unpack_array(&mut cur, &mut recv[..], arraysz, defl.as_ref()) {
-        Ok(rsz) if recv.len() <= arraysz || defl.is_some() => rsz,                  // normal success
-        Err(Error(ErrorKind::InvalidLen(_), _)) => return defl.is_none() && recv.len() > arraysz,    // expected if recv is too big and there's no default
+        Ok(rsz) if recv.len() <= arraysz || defl.is_some() => rsz, // normal success
+        Err(Error(ErrorKind::InvalidLen(_), _)) => return defl.is_none() && recv.len() > arraysz, // expected if recv is too big and there's no default
         Err(e) => {
             println!("unpack_array failed {:?}", e);
             return false;
@@ -224,9 +226,10 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
     }
 
     // data and recv must match their common prefix up to arraysz
-    if data.iter().zip(recv.iter().take(arraysz)).any(
-        |(d, r)| *d != *r,
-    )
+    if data
+        .iter()
+        .zip(recv.iter().take(arraysz))
+        .any(|(d, r)| *d != *r)
     {
         println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv);
         return false;
@@ -246,9 +249,7 @@ fn check_array(arraysz: usize, rxsize: usize, data: Vec<u32>, defl: Option<u32>)
 
 #[test]
 fn quickcheck_array() {
-    quickcheck(
-        check_array as fn(usize, usize, Vec<u32>, Option<u32>) -> bool,
-    );
+    quickcheck(check_array as fn(usize, usize, Vec<u32>, Option<u32>) -> bool);
 }
 
 fn check_opaque(arraysz: usize, rxsize: usize, data: Vec<u8>) -> bool {
@@ -292,9 +293,10 @@ fn check_opaque(arraysz: usize, rxsize: usize, data: Vec<u8>) -> bool {
     }
 
     // data and recv must match their common prefix up to arraysz
-    if data.iter().zip(recv.iter().take(arraysz)).any(
-        |(d, r)| *d != *r,
-    )
+    if data
+        .iter()
+        .zip(recv.iter().take(arraysz))
+        .any(|(d, r)| *d != *r)
     {
         println!("nonmatching\ndata {:?}\nrecv {:?}", data, recv);
         return false;
