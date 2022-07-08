@@ -3,10 +3,10 @@ extern crate xdr_codec;
 
 use std::io::{Cursor, Write};
 
-use quickcheck::{TestResult, quickcheck};
+use quickcheck::{quickcheck, TestResult};
 
-use xdr_codec::Pack;
 use xdr_codec::record::{XdrRecordReader, XdrRecordWriter};
+use xdr_codec::Pack;
 
 // Make sure XdrRecordWriter writes the right stuff
 fn check_writerec(bufsz: usize, eor: bool, ref bytes: Vec<u8>) -> TestResult {

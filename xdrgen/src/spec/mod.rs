@@ -1,6 +1,6 @@
 use std::collections::btree_map::{BTreeMap, Iter};
 use std::collections::{HashMap, HashSet};
-use std::io::{Write, stderr};
+use std::io::{stderr, Write};
 
 use std::result;
 
@@ -36,19 +36,19 @@ impl ToTokens for Derives {
 
         let mut der = Vec::new();
 
-        if self.contains(COPY) {
+        if self.contains(Derives::COPY) {
             der.push(quote!(Copy))
         }
-        if self.contains(CLONE) {
+        if self.contains(Derives::CLONE) {
             der.push(quote!(Clone))
         }
-        if self.contains(DEBUG) {
+        if self.contains(Derives::DEBUG) {
             der.push(quote!(Debug))
         }
-        if self.contains(EQ) {
+        if self.contains(Derives::EQ) {
             der.push(quote!(Eq))
         }
-        if self.contains(PARTIALEQ) {
+        if self.contains(Derives::PARTIALEQ) {
             der.push(quote!(PartialEq))
         }
 
@@ -60,20 +60,15 @@ impl ToTokens for Derives {
 lazy_static! {
     static ref KEYWORDS: HashSet<&'static str> = {
         let kws = [
-            "abstract",	"alignof", "as", "become", "box",
-            "break", "const", "continue", "crate", "do",
-            "else", "enum", "extern", "false", "final",
-            "fn", "for", "if", "impl", "in",
-            "let", "loop", "macro", "match", "mod",
-            "move", "mut", "offsetof", "override", "priv",
-            "proc", "pub", "pure", "ref", "return",
-            "Self", "self", "sizeof", "static", "struct",
-            "super", "trait", "true", "type", "typeof",
-            "unsafe", "unsized", "use", "virtual", "where",
-            "while", "yield",
+            "abstract", "alignof", "as", "become", "box", "break", "const", "continue", "crate",
+            "do", "else", "enum", "extern", "false", "final", "fn", "for", "if", "impl", "in",
+            "let", "loop", "macro", "match", "mod", "move", "mut", "offsetof", "override", "priv",
+            "proc", "pub", "pure", "ref", "return", "Self", "self", "sizeof", "static", "struct",
+            "super", "trait", "true", "type", "typeof", "unsafe", "unsized", "use", "virtual",
+            "where", "while", "yield",
         ];
 
-        kws.into_iter().map(|x| *x).collect()
+        kws.iter().map(|x| *x).collect()
     };
 }
 
@@ -101,13 +96,11 @@ impl Value {
     fn as_ident(&self) -> quote::Ident {
         match self {
             &Value::Ident(ref id) => quote_ident(id),
-            &Value::Const(val) => {
-                quote::Ident::new(format!(
-                    "Const{}{}",
-                    (if val < 0 { "_" } else { "" }),
-                    val.abs()
-                ))
-            }
+            &Value::Const(val) => quote::Ident::new(format!(
+                "Const{}{}",
+                (if val < 0 { "_" } else { "" }),
+                val.abs()
+            )),
         }
     }
 
@@ -207,12 +200,10 @@ impl Type {
         match self {
             &Int | &UInt | &Hyper | &UHyper | &Float | &Double | &Quadruple | &Bool => true,
 
-            &Ident(ref id, _) => {
-                match symtab.typespec(id) {
-                    None => false,
-                    Some(ref ty) => ty.is_prim(symtab),
-                }
-            }
+            &Ident(ref id, _) => match symtab.typespec(id) {
+                None => false,
+                Some(ref ty) => ty.is_prim(symtab),
+            },
 
             _ => false,
         }
@@ -222,7 +213,7 @@ impl Type {
         use self::Type::*;
         let mut memoset = HashMap::new();
 
-        let mut memo = match memo {
+        let memo = match memo {
             None => &mut memoset,
             Some(m) => m,
         };
@@ -238,55 +229,62 @@ impl Type {
             &Array(ref ty, ref len) => {
                 let ty = ty.as_ref();
                 let set = match ty {
-                    &Opaque | &String => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
+                    &Opaque | &String => {
+                        Derives::EQ
+                            | Derives::PARTIALEQ
+                            | Derives::COPY
+                            | Derives::CLONE
+                            | Derives::DEBUG
+                    }
                     ref ty => ty.derivable(symtab, Some(memo)),
                 };
                 match len.as_i64(symtab) {
                     Some(v) if v <= 32 => set,
-                    _ => Derives::empty(),   // no #[derive] for arrays > 32
+                    _ => Derives::empty(), // no #[derive] for arrays > 32
                 }
             }
             &Flex(ref ty, ..) => {
                 let set = ty.derivable(symtab, Some(memo));
-                set & !COPY // no Copy, everything else OK
+                set & !Derives::COPY // no Copy, everything else OK
             }
-            &Enum(_) => EQ | PARTIALEQ | COPY | CLONE | DEBUG,
+            &Enum(_) => {
+                Derives::EQ | Derives::PARTIALEQ | Derives::COPY | Derives::CLONE | Derives::DEBUG
+            }
             &Option(ref ty) => ty.derivable(symtab, Some(memo)),
-            &Struct(ref fields) => {
-                fields.iter().fold(Derives::all(), |a, f| {
-                    a & f.derivable(symtab, memo)
-                })
-            }
+            &Struct(ref fields) => fields
+                .iter()
+                .fold(Derives::all(), |a, f| a & f.derivable(symtab, memo)),
 
             &Union(_, ref cases, ref defl) => {
-                cases.iter().map(|c| &c.1).fold(Derives::all(), |a, c| {
-                    a & c.derivable(symtab, memo)
-                }) &
-                    defl.as_ref().map_or(
-                        Derives::all(),
-                        |d| d.derivable(symtab, memo),
-                    )
+                cases
+                    .iter()
+                    .map(|c| &c.1)
+                    .fold(Derives::all(), |a, c| a & c.derivable(symtab, memo))
+                    & defl
+                        .as_ref()
+                        .map_or(Derives::all(), |d| d.derivable(symtab, memo))
             }
 
             &Ident(_, Some(derives)) => derives,
 
             &Ident(ref id, None) => {
                 match symtab.typespec(id) {
-                    None => Derives::empty(),  // unknown, really
+                    None => Derives::empty(), // unknown, really
                     Some(ref ty) => ty.derivable(symtab, Some(memo)),
                 }
             }
 
-            &Float | &Double => PARTIALEQ | COPY | CLONE | DEBUG,
+            &Float | &Double => {
+                Derives::PARTIALEQ | Derives::COPY | Derives::CLONE | Derives::DEBUG
+            }
             ty if ty.is_prim(symtab) => Derives::all(),
 
-            _ => Derives::all() & !COPY,
+            _ => Derives::all() & !Derives::COPY,
         };
 
         memo.insert(self.clone(), set);
         set
     }
-
 
     fn packer(&self, val: Tokens, symtab: &Symtab) -> Result<Tokens> {
         use self::Type::*;
@@ -331,8 +329,8 @@ impl Type {
         use self::Type::*;
 
         match self {
-            &Opaque | &String | &Option(_) | &Ident(..) | &Int | &UInt | &Hyper | &UHyper |
-            &Float | &Double | &Quadruple | &Bool => true,
+            &Opaque | &String | &Option(_) | &Ident(..) | &Int | &UInt | &Hyper | &UHyper
+            | &Float | &Double | &Quadruple | &Bool => true,
             _ => false,
         }
     }
@@ -610,12 +608,12 @@ impl Emit for Typespec {
             &Enum(ref edefs) => {
                 let defs: Vec<_> = edefs
                     .iter()
-                    .filter_map(|&EnumDefn(ref field, _)| if let Some((val, Some(_))) =
-                        symtab.getconst(field)
-                    {
-                        Some((quote_ident(field), val as isize))
-                    } else {
-                        None
+                    .filter_map(|&EnumDefn(ref field, _)| {
+                        if let Some((val, Some(_))) = symtab.getconst(field) {
+                            Some((quote_ident(field), val as isize))
+                        } else {
+                            None
+                        }
                     })
                     .map(|(field, val)| quote!(#field = #val,))
                     .collect();
@@ -653,19 +651,15 @@ impl Emit for Typespec {
                     };
 
                     match case {
-                        &Const(val) if val < 0 => {
-                            match seltype {
-                                &Int | &Hyper => true,
-                                _ => false,
-                            }
-                        }
+                        &Const(val) if val < 0 => match seltype {
+                            &Int | &Hyper => true,
+                            _ => false,
+                        },
 
-                        &Const(_) => {
-                            match seltype {
-                                &Int | &Hyper | &UInt | &UHyper => true,
-                                _ => false,
-                            }
-                        }
+                        &Const(_) => match seltype {
+                            &Int | &Hyper | &UInt | &UHyper => true,
+                            _ => false,
+                        },
 
                         &Ident(ref id) => {
                             if *seltype == Bool {
@@ -688,9 +682,10 @@ impl Emit for Typespec {
                     .iter()
                     .map(|&UnionCase(ref val, ref decl)| {
                         if !compatcase(val) {
-                            return Err(Error::from(
-                                format!("incompat selector {:?} case {:?}", selector, val),
-                            ));
+                            return Err(Error::from(format!(
+                                "incompat selector {:?} case {:?}",
+                                selector, val
+                            )));
                         }
 
                         let label = val.as_ident();
@@ -759,8 +754,8 @@ impl Emit for Typespec {
 
 impl Emitpack for Typespec {
     fn pack(&self, symtab: &Symtab) -> Result<Option<Tokens>> {
-        use self::Type::*;
         use self::Decl::*;
+        use self::Type::*;
 
         let name = quote_ident(&self.0);
         let ty = &self.1;
@@ -773,7 +768,8 @@ impl Emitpack for Typespec {
             }
 
             &Struct(ref decl) => {
-                let decls: Vec<_> = decl.iter()
+                let decls: Vec<_> = decl
+                    .iter()
                     .filter_map(|d| match d {
                         &Void => None,
                         &Named(ref name, ref ty) => Some((quote_ident(name), ty)),
@@ -856,8 +852,8 @@ impl Emitpack for Typespec {
     }
 
     fn unpack(&self, symtab: &Symtab) -> Result<Option<Tokens>> {
-        use self::Type::*;
         use self::Decl::*;
+        use self::Type::*;
 
         let name = quote_ident(&self.0);
         let ty = &self.1;
@@ -866,7 +862,8 @@ impl Emitpack for Typespec {
         let body = match ty {
             &Enum(ref defs) => {
                 directive = quote!(#[inline]);
-                let matchdefs: Vec<_> = defs.iter()
+                let matchdefs: Vec<_> = defs
+                    .iter()
                     .filter_map(|&EnumDefn(ref name, _)| {
                         let tok = quote_ident(name);
                         if let Some((ref _val, ref scope)) = symtab.getconst(name) {
@@ -1031,15 +1028,13 @@ impl Symtab {
             for &EnumDefn(ref name, ref maybeval) in edefn {
                 let v = match maybeval {
                     &None => prev + 1,
-                    &Some(ref val) => {
-                        match self.value(val) {
-                            Some(c) => c,
-                            None => {
-                                let _ = writeln!(&mut err, "Unknown value {:?}", val);
-                                continue;
-                            }
+                    &Some(ref val) => match self.value(val) {
+                        Some(c) => c,
+                        None => {
+                            let _ = writeln!(&mut err, "Unknown value {:?}", val);
+                            continue;
                         }
-                    }
+                    },
                 };
 
                 prev = v;
@@ -1078,12 +1073,10 @@ impl Symtab {
 
     pub fn typespec(&self, name: &String) -> Option<&Type> {
         match self.typespecs.get(name) {
-            None => {
-                match self.typesyns.get(name) {
-                    None => None,
-                    Some(ty) => Some(ty),
-                }
-            }
+            None => match self.typesyns.get(name) {
+                None => None,
+                Some(ty) => Some(ty),
+            },
             Some(ty) => Some(ty),
         }
     }
@@ -1100,7 +1093,6 @@ impl Symtab {
         self.typesyns.iter()
     }
 }
-
 
 #[cfg(test)]
 mod test;

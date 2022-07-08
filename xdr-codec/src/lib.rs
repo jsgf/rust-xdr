@@ -23,11 +23,11 @@ extern crate byteorder;
 #[macro_use]
 extern crate error_chain;
 
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::borrow::{Borrow, Cow};
+use std::cmp::min;
 pub use std::io::{Read, Write};
 use std::ops::Deref;
-use std::cmp::min;
-use std::borrow::{Borrow, Cow};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod record;
 
@@ -193,9 +193,11 @@ where
     T: Unpack<In> + Clone,
 {
     #[inline]
-    fn set<T>(p: &mut T, v: T) { *p = v }
+    fn set<T>(p: &mut T, v: T) {
+        *p = v
+    }
     #[inline]
-    fn drop<T>(_: &mut T) { }
+    fn drop<T>(_: &mut T) {}
 
     unpack_array_with(input, array, arraysz, set, drop, defl)
 }
@@ -207,7 +209,7 @@ pub fn unpack_array_with<In, T>(
     input: &mut In,
     array: &mut [T],
     arraysz: usize,
-    set: fn (&mut T, T),
+    set: fn(&mut T, T),
     drop: fn(&mut T),
     defl: Option<&T>,
 ) -> Result<usize>
@@ -217,24 +219,24 @@ where
 {
     let mut rsz = 0;
     let sz = min(arraysz, array.len());
- 
+
     // If we fail part way through then return the error and the index we got up to
     // so we can clean up the entries we did initialize.
     let res = (|| {
-            for (idx, elem) in (&mut array[..sz]).into_iter().enumerate() {
-                let (v, sz) = match Unpack::unpack(input) {
-                    Ok(v) => v,
-                    Err(e) => return Some((idx, e)),
-                };
-                rsz += sz;
-                set(elem, v);
-            }
-            None
-        })();
+        for (idx, elem) in (&mut array[..sz]).into_iter().enumerate() {
+            let (v, sz) = match Unpack::unpack(input) {
+                Ok(v) => v,
+                Err(e) => return Some((idx, e)),
+            };
+            rsz += sz;
+            set(elem, v);
+        }
+        None
+    })();
     if let Some((idx, err)) = res {
         for elem in &mut array[..idx] {
             drop(elem)
-        };
+        }
         return Err(err);
     }
 
@@ -398,54 +400,54 @@ impl<Out: Write> Pack<Out> for i8 {
 impl<Out: Write> Pack<Out> for u32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_u32::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 4,
-        )
+        out.write_u32::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 4)
     }
 }
 
 impl<Out: Write> Pack<Out> for i32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_i32::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 4,
-        )
+        out.write_i32::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 4)
     }
 }
 
 impl<Out: Write> Pack<Out> for u64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_u64::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 8,
-        )
+        out.write_u64::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 8)
     }
 }
 
 impl<Out: Write> Pack<Out> for i64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_i64::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 8,
-        )
+        out.write_i64::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 8)
     }
 }
 
 impl<Out: Write> Pack<Out> for f32 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_f32::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 4,
-        )
+        out.write_f32::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 4)
     }
 }
 
 impl<Out: Write> Pack<Out> for f64 {
     #[inline]
     fn pack(&self, out: &mut Out) -> Result<usize> {
-        out.write_f64::<BigEndian>(*self).map_err(Error::from).map(
-            |_| 8,
-        )
+        out.write_f64::<BigEndian>(*self)
+            .map_err(Error::from)
+            .map(|_| 8)
     }
 }
 
@@ -587,11 +589,10 @@ pub trait Unpack<In: Read>: Sized {
 impl<In: Read> Unpack<In> for u8 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u32::<BigEndian>().map_err(Error::from).map(
-            |v| {
-                (v as u8, 4)
-            },
-        )
+        input
+            .read_u32::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v as u8, 4))
     }
 }
 
@@ -599,63 +600,68 @@ impl<In: Read> Unpack<In> for u8 {
 impl<In: Read> Unpack<In> for i8 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i32::<BigEndian>().map_err(Error::from).map(
-            |v| {
-                (v as i8, 4)
-            },
-        )
+        input
+            .read_i32::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v as i8, 4))
     }
 }
 
 impl<In: Read> Unpack<In> for u32 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u32::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 4),
-        )
+        input
+            .read_u32::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 4))
     }
 }
 
 impl<In: Read> Unpack<In> for i32 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i32::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 4),
-        )
+        input
+            .read_i32::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 4))
     }
 }
 
 impl<In: Read> Unpack<In> for u64 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_u64::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 8),
-        )
+        input
+            .read_u64::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 8))
     }
 }
 
 impl<In: Read> Unpack<In> for i64 {
     #[inline]
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_i64::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 8),
-        )
+        input
+            .read_i64::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 8))
     }
 }
 
 impl<In: Read> Unpack<In> for f32 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_f32::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 4),
-        )
+        input
+            .read_f32::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 4))
     }
 }
 
 impl<In: Read> Unpack<In> for f64 {
     fn unpack(input: &mut In) -> Result<(Self, usize)> {
-        input.read_f64::<BigEndian>().map_err(Error::from).map(
-            |v| (v, 8),
-        )
+        input
+            .read_f64::<BigEndian>()
+            .map_err(Error::from)
+            .map(|v| (v, 8))
     }
 }
 

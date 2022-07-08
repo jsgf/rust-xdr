@@ -1,5 +1,5 @@
-use super::specification;
 use super::super::generate;
+use super::specification;
 use std::io::Cursor;
 
 #[test]
@@ -232,7 +232,6 @@ default:
     );
     println!("spec {:?}", s);
     assert!(s.is_ok())
-
 }
 
 #[test]
